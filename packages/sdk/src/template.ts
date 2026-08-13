@@ -179,6 +179,7 @@ function lookup(expr: string, ctx: TemplateContext): unknown {
   // renders empty is dropped, so `"${args.parcel-size:+shipping_methods}"`
   // includes the whole shipping block only when --parcel-size was passed —
   // sending a half-built group would overwrite what's on the listing today.
+  // Binds before `|`, so the literal can itself contain a pipe.
   const guard = expr.indexOf(":+");
   if (guard !== -1) {
     return isAbsent(lookup(expr.slice(0, guard), ctx)) ? "" : expr.slice(guard + 2);

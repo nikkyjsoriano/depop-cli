@@ -251,7 +251,6 @@ paths:
             x-mastro-resolve: { from: "file:reference/department_gender.json", keyed: true,
                                 key_template: "${args.department}" } }
         - { name: parcel-size, description: "small/medium/large/xl/xxl (default medium)" }
-        - { name: no-boost, description: "disable the free boost", boolean: true }
       x-mastro-workflow:
         result: createListing
         steps:
@@ -341,7 +340,11 @@ paths:
                 age: "${args.age|[]}"
                 style: "${args.style|[]}"
                 source: "${args.source|[]}"
-                boost: { status: active }
+                # Boost is pinned OFF. mastro never enables a paid/free boost on
+                # a listing by itself; making it a real choice is separate work,
+                # and until then the safe value is the one that costs nothing and
+                # surprises nobody. Do not template this off a flag.
+                boost: { status: inactive }
                 variant_set: "${num:args.variant-set}"
                 # Size mapping: variants is { <member-id>: quantity }. The runner
                 # drops object entries whose key resolves empty, so a one-size

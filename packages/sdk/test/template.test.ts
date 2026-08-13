@@ -63,10 +63,17 @@ test("renderDeep drops missing optional array elements rather than nulling them"
   expect(renderDeep(["${?args.a}", "${?args.b}"], { args: { b: "y" } })).toEqual(["y"]);
 });
 
+test("${?path} inside a mixed string interpolates to nothing instead of throwing", () => {
+  expect(renderTemplate("size-${?a}", {})).toBe("size-");
+  expect(renderTemplate("size-${?a}", { a: "M" })).toBe("size-M");
+});
+
 test("${path:+literal} renders the literal only when the path is set", () => {
   expect(renderTemplate("${a:+shipping_methods}", { a: "medium" })).toBe("shipping_methods");
   expect(renderTemplate("${a:+shipping_methods}", { a: "" })).toBe("");
   expect(renderTemplate("${a:+shipping_methods}", {})).toBe("");
+  // The guard binds before `|`, so a literal may contain a pipe.
+  expect(renderTemplate("${a:+one|two}", { a: "set" })).toBe("one|two");
 });
 
 test("a guarded key drops its whole group, and skips rendering the group's body", () => {

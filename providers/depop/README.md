@@ -98,6 +98,10 @@ mastro depop list \
   listing so the size attaches correctly.
 - **`--dry-run` builds and prints every request body without uploading or
   posting** — always dry-run first. See [`docs/WORKFLOWS.md`](../../docs/WORKFLOWS.md).
+- **Boost is never enabled.** The create body pins `boost` to `inactive` and
+  there is no flag for it; making boost a real choice is separate work.
+- Depop's payload has no title field. The listing text is `description`, and its
+  first line is what reads as the title.
 
 ### Updating a listing
 
@@ -123,7 +127,8 @@ create body carries except photos is editable: `--price`, `--currency`,
   ignored. Sending half a group would overwrite what is on the listing today.
 - **Never sent:** `picture_ids` (photos are a separate piece of work),
   `boost`, and the create-time `listing_lifecycle_id` / `persistent_id`.
-- Depop's payload has no title field. The listing text is `description`.
+- Depop's payload has no title field. The listing text is `description`, and its
+  first line is what reads as the title, so retitling is a `--description` edit.
 - An empty value counts as "not passed", so `--description ""` does not clear
   the text.
 
@@ -189,7 +194,8 @@ notice. If `search` starts returning Cloudflare HTML or a shape without an
 > and `is_kids`.
 
 > The `update` flow is derived from that same create body but has **not** been
-> confirmed against a captured edit (see the warning above). Two known gaps for
+> confirmed against a captured edit (see the warning above). Three known gaps for
 > the next capture: `is_kids` is never sent, so moving a listing into or out of
-> kidswear may not stick, and `quantity` is sent as passed rather than as
-> create's `null`-when-sized convention.
+> kidswear may not stick; `quantity` is sent as passed rather than as create's
+> `null`-when-sized convention; and `national_shipping_cost`, which create sends
+> alongside `shipping_methods`, is never sent, so a shipping edit may need it.

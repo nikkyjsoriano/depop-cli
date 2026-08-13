@@ -1,12 +1,13 @@
 /**
- * The Depop `update` workflow, planned against the real provider spec.
+ * The Depop listing write flows (`list` and `update`), planned against the real
+ * provider spec.
  *
- * The point of an update command is what it does NOT send: a price edit must
- * not carry a size, a shipping block, photos, or a boost. These run the actual
- * providers/depop/openapi.yaml through a dry run, so drift in that file shows
- * up here rather than on Nikky's live listings.
+ * Most of what matters here is what these bodies do NOT send: a price edit must
+ * not carry a size, a shipping block, or photos, and neither flow may ever
+ * enable a boost. These run the actual providers/depop/openapi.yaml through a
+ * dry run, so drift in that file shows up here rather than on a live listing.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, test } from "bun:test";
@@ -16,16 +17,24 @@ import { WorkflowRunner } from "../src/index.ts";
 
 const SPEC_PATH = join(import.meta.dir, "../../../providers/depop/openapi.yaml");
 
+interface PlannedStep {
+  step: string;
+  method: string;
+  url: string;
+  body: Record<string, unknown>;
+}
+
 function depopSpec(): OpenApiSpec {
   return parseOpenApi(readFileSync(SPEC_PATH, "utf8"));
 }
 
 /**
- * Plan the update workflow. `args` is what the CLI + connector hand the runner:
- * flags the user typed, plus the derived flags (variant-set / variant / gender),
- * which the file-backed resolver sets to "" when their inputs weren't passed.
+ * Dry-run a workflow command and return its planned requests. `args` is what
+ * the CLI + connector hand the runner: the flags the user typed, plus the
+ * derived ones (variant-set / variant / gender), which the file-backed resolver
+ * sets to "" when their inputs weren't passed.
  */
-async function planUpdate(args: Record<string, unknown>): Promise<{ method: string; url: string; body: Record<string, unknown> }> {
+async function plan(command: string, args: Record<string, unknown>): Promise<PlannedStep[]> {
   const spec = depopSpec();
   const runner = new WorkflowRunner({
     spec,
@@ -36,16 +45,19 @@ async function planUpdate(args: Record<string, unknown>): Promise<{ method: stri
     },
     dryRun: true,
   });
-  const op = spec.byCommand("update")!;
-  const result = (await runner.run(op, args)) as {
-    planned_requests: { step: string; method: string; url: string; body: Record<string, unknown> }[];
-  };
-  const req = result.planned_requests.find((r) => r.step === "updateListing")!;
-  return { method: req.method, url: req.url, body: req.body };
+  const op = spec.byCommand(command)!;
+  const result = (await runner.run(op, args)) as { planned_requests: PlannedStep[] };
+  return result.planned_requests;
+}
+
+async function planUpdate(args: Record<string, unknown>): Promise<PlannedStep> {
+  return (await plan("update", args)).find((r) => r.step === "updateListing")!;
 }
 
 /** The derived flags as they arrive when the user passed no size/department. */
 const NO_DERIVED = { "variant-set": "", variant: "", gender: "" };
+
+// -- update -----------------------------------------------------------------
 
 test("update is a command and hits the listing endpoint on the webapi host", async () => {
   const { method, url } = await planUpdate({ id: "123456789", price: "20", ...NO_DERIVED });
@@ -131,4 +143,42 @@ test("an update never carries photos, boost, or the create-time identifiers", as
     expect(body[forbidden]).toBeUndefined();
   }
   expect(JSON.stringify(body)).not.toContain("boost");
+});
+
+// -- create -----------------------------------------------------------------
+
+/** A stand-in photo: the s3Put step reads the file's bytes even in a dry run. */
+function tempPhoto(): string {
+  const path = `/tmp/mastro-depop-test-${process.pid}.jpg`;
+  writeFileSync(path, new Uint8Array([0xff, 0xd8, 0xff]));
+  return path;
+}
+
+test("the create body pins boost off", async () => {
+  // The hard rule: mastro never enables a boost on a listing. Boost is a fixed
+  // `inactive` in the spec, so this fails the moment anyone flips it or wires it
+  // to a flag.
+  const steps = await plan("list", {
+    photo: [tempPhoto()],
+    brand: "polo-ralph-lauren",
+    department: "menswear",
+    type: "tshirts",
+    size: "M",
+    condition: "used_good",
+    colour: ["navy"],
+    price: "25",
+    description: "Vintage Polo tee #ralphlauren",
+    address: "San Francisco, United States",
+    "address-id": "42475963",
+    lat: "37.779026",
+    lng: "-122.419906",
+    "variant-set": "54",
+    variant: "4",
+    gender: "male",
+  });
+
+  const create = steps.find((s) => s.step === "createListing")!;
+  expect(create.body.boost).toEqual({ status: "inactive" });
+  // Quoted, so "inactive" doesn't match: no field anywhere is the string "active".
+  expect(JSON.stringify(create.body)).not.toContain('"active"');
 });
