@@ -56,6 +56,7 @@ mastro depop search ...
 | `search` | `GET https://www.depop.com/presentation/api/v1/search/products/` |
 | `me`     | `GET /api/v1/users/{user_id}/` — ⚠️ see host note (currently 404s) |
 | `list`   | multi-step workflow: upload photos → poll → create listing |
+| `update` | `PATCH https://webapi.depop.com/presentation/api/v1/listing/products/{id}/` — edit a listing, photos excluded |
 
 > **Host split (important — it's the #1 source of 404s).** Depop serves its API
 > from **two** hosts. `www.depop.com` answers the `/presentation/*` search path.
@@ -97,6 +98,45 @@ mastro depop list \
   listing so the size attaches correctly.
 - **`--dry-run` builds and prints every request body without uploading or
   posting** — always dry-run first. See [`docs/WORKFLOWS.md`](../../docs/WORKFLOWS.md).
+
+### Updating a listing
+
+Edits everything except photos. Only the flags you pass are sent, so any field
+you leave out keeps its current value.
+
+```bash
+mastro depop update 123456789 --price 20 --dry-run
+mastro depop update 123456789 --description "Vintage Polo tee #ralphlauren #vintage"
+mastro depop update 123456789 --department menswear --type tshirts --size L
+mastro depop update 123456789 --parcel-size large --address-id 42475963
+```
+
+The listing id is the numeric product id (positional, or `--id`). Everything the
+create body carries except photos is editable: `--price`, `--currency`,
+`--description`, `--brand`, `--condition`, `--colour`, `--department`, `--type`,
+`--size`, `--quantity`, `--age`, `--style`, `--source`, `--address`, `--lat`,
+`--lng`, `--address-id`, `--parcel-size`.
+
+- **Two fields go out as a whole block or not at all.** Size is the `variants`
+  map, so it needs `--department --type --size` together (the same derivation
+  `list` uses); shipping needs `--parcel-size`, and `--address-id` on its own is
+  ignored. Sending half a group would overwrite what is on the listing today.
+- **Never sent:** `picture_ids` (photos are a separate piece of work),
+  `boost`, and the create-time `listing_lifecycle_id` / `persistent_id`.
+- Depop's payload has no title field. The listing text is `description`.
+- An empty value counts as "not passed", so `--description ""` does not clear
+  the text.
+
+> ⚠️ **The wire shape is not verified yet.** `list` was recovered from a real
+> capture; this was not. The method, path, and field names are inferred from the
+> create payload, which is ground truth for what a listing holds but not for how
+> an edit is submitted. A HAR of an actual edit on depop.com has to settle three
+> things: whether it is `PATCH .../listing/products/{id}/` or a `PUT` or a
+> separate path; whether `{id}` is the numeric product id or the slug; and
+> whether Depop merges the fields you send or replaces the whole product. If it
+> replaces, this command needs a read step first (GET the listing, merge, send it
+> all back including `picture_ids`) or an edit will drop what it omits.
+> **Dry-run first and check the body.**
 
 ### Search filters
 
@@ -147,3 +187,9 @@ notice. If `search` starts returning Cloudflare HTML or a shape without an
 > `picture_ids` (extracted from the slot S3 URL), numeric `geo_position_*` /
 > `ship_from_address_id` / `variant_set`, `quantity: null` when `variants` is set,
 > and `is_kids`.
+
+> The `update` flow is derived from that same create body but has **not** been
+> confirmed against a captured edit (see the warning above). Two known gaps for
+> the next capture: `is_kids` is never sent, so moving a listing into or out of
+> kidswear may not stick, and `quantity` is sent as passed rather than as
+> create's `null`-when-sized convention.

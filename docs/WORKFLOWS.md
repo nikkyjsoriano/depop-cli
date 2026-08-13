@@ -101,6 +101,14 @@ dotted path into it, e.g. `createListing.slug`).
 - `${args.<flag>|<default>}` — with a literal fallback (`${args.currency|USD}`).
   The fallbacks `[]` and `{}` yield a real empty array / object, not the strings
   `"[]"` / `"{}"` — so an omitted repeatable flag becomes `[]` in the body.
+- `${?args.<flag>}` — **optional**: a flag that wasn't passed (or resolved empty)
+  yields nothing and the body entry holding it is dropped. This is how a partial
+  update is expressed as data: the fields the user didn't pass never reach the
+  wire, so the remote object keeps them.
+- `${args.<flag>:+<literal>}` — **guard**: renders the literal when the flag is
+  set, `""` otherwise. Used on a key, so a group that only makes sense whole (a
+  shipping block, a variants map) is sent whole or not at all:
+  `"${args.parcel-size:+shipping_methods}"`.
 - `${steps.<id>...}` — a prior step's result
 - `${item}` / `${<as>}` / `${index}` — the current foreach element / its index
 - `${uuid}` / `${now}` — generated per use
@@ -114,7 +122,9 @@ A whole-placeholder string (`"${steps.slots}"`) preserves the resolved value's
 type (array/object/number); a mixed string interpolates to text. In a body
 object, **keys are templated too** — `{ "${args.variant}": 1 }` → `{ "4": 1 }`,
 and an entry whose key resolves empty is dropped (so a one-size item with no
-variant yields `{}`).
+variant yields `{}`). A dropped key short-circuits its value: the body of an
+entry that isn't being sent is never rendered, so a guarded group can reference
+flags that only exist when its guard passed.
 
 ## Deriving values from bundled data
 

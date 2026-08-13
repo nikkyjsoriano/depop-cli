@@ -357,6 +357,122 @@ paths:
       responses:
         "201": { description: Listing created. }
 
+  # =========================================================================
+  # Update a listing — everything except photos.
+  #
+  # ⚠️ UNVERIFIED SHAPE. Unlike `list`, this flow was NOT recovered from a
+  # captured edit: no HAR of a real depop.com listing edit exists yet. The
+  # endpoint (PATCH on the create path + /{id}/) and the field names are
+  # inferred from the create payload, which is the ground truth for what the
+  # listing object holds. What a capture has to settle:
+  #   1. method + path — PATCH .../listing/products/{id}/ vs PUT vs a separate
+  #      /edit path, and whether {id} is the numeric product id or the slug;
+  #   2. partial vs full-replace — if Depop replaces the whole product on write,
+  #      this flow needs a read step first (GET the listing, merge, send it all,
+  #      picture_ids included) or an edit would drop the fields it omits;
+  #   3. whether price edits must carry price_currency, and whether changing
+  #      department needs is_kids / variant_set sent alongside.
+  # Until then: --dry-run prints the exact body and nothing is sent.
+  #
+  # Photos are deliberately out of scope here (picture_ids is never sent, so an
+  # edit can't disturb them). Photo replacement reuses the upload pipeline the
+  # list workflow already has and is tracked separately.
+  # =========================================================================
+  /x-mastro/update:
+    post:
+      operationId: update
+      x-mastro-command: update
+      summary: Update an existing listing (all fields except photos).
+      description: >
+        Partial update: only the flags you pass are put on the wire, so every
+        field you leave out keeps its current value. Photos are not editable
+        here. Takes the listing id positionally, e.g.
+        `mastro depop update 123456789 --price 20`. The endpoint shape is
+        inferred from the create payload and is not yet confirmed against a
+        captured edit — always --dry-run first.
+      x-mastro-args:
+        - { name: id, description: "listing (product) id, from the create response or the listing URL", required: true }
+        - { name: price, description: "new numeric price, e.g. 20" }
+        - { name: currency, description: "price currency, only if it changes" }
+        - { name: description, description: "listing text (include #hashtags inline, max 5)" }
+        - { name: brand, description: "brand slug, e.g. polo-ralph-lauren" }
+        - { name: condition, description: "item condition",
+            enum: [brand_new, used_like_new, used_excellent, used_good, used_fair] }
+        - { name: colour, description: "colour (repeatable, up to 2) — replaces the current colours", multiple: true }
+        - { name: department, description: "menswear / womenswear / kidswear / everything-else; also re-derives gender",
+            enum: [menswear, womenswear, kidswear, everything-else] }
+        - { name: type, description: "product type, e.g. tshirts / jumpers / jeans (needs --department too)" }
+        - { name: size, description: "human size, e.g. M (needs --department and --type to resolve)" }
+        - { name: quantity, description: "stock count, for one-size listings" }
+        - { name: age, description: "e.g. y2k (repeatable, up to 1)", multiple: true }
+        - { name: style, description: "e.g. streetwear (repeatable, up to 3)", multiple: true }
+        - { name: source, description: "e.g. preloved (repeatable, up to 2)", multiple: true }
+        - { name: address, description: 'e.g. "San Francisco, United States"' }
+        - { name: lat, description: "geo latitude" }
+        - { name: lng, description: "geo longitude" }
+        - { name: address-id, description: "ship-from address id (shipping block)" }
+        - { name: parcel-size, description: "small/medium/large/xl/xxl — sends the whole shipping block" }
+        # Derived exactly as in the list workflow: department/type → size set,
+        # then size set + size → the variant member id, and department → gender.
+        # Each resolves to "" when its inputs weren't passed, which drops the
+        # field from the body (that is the whole point of a partial update).
+        - { name: variant-set, description: "size set id (derived from department/type)",
+            x-mastro-resolve: { from: "file:reference/categories.json", keyed: true, value_path: size_set_us,
+                                key_template: "${args.department}/${args.type}" } }
+        - { name: variant, description: "size variant id (derived from size set + size)",
+            x-mastro-resolve: { from: "file:reference/size_variants.json", keyed: true,
+                                key_template: "${args.variant-set}/${args.size}" } }
+        - { name: gender, description: "male / female / unisex (derived from department)",
+            x-mastro-resolve: { from: "file:reference/department_gender.json", keyed: true,
+                                key_template: "${args.department}" } }
+      x-mastro-workflow:
+        result: updateListing
+        steps:
+          # One step, but still a workflow: only a workflow step can pin the
+          # webapi host (the listing endpoints 404 on www) and only a workflow
+          # command supports --dry-run.
+          - id: updateListing
+            operationId: updateListing
+            request:
+              url: "https://webapi.depop.com/presentation/api/v1/listing/products/${args.id}/"
+              # Every field is `${?...}` — optional. A flag the user didn't pass
+              # resolves to nothing and its entry is dropped, so the listing
+              # keeps that value. Deliberately absent, whatever the flags say:
+              # picture_ids (photos are out of scope), boost (never enabled by
+              # mastro), and listing_lifecycle_id / persistent_id (create-time
+              # identifiers — regenerating them on an edit would be wrong).
+              body:
+                price_amount: "${?args.price}"
+                price_currency: "${?args.currency}"
+                description: "${?args.description}"
+                brand: "${?args.brand}"
+                condition: "${?args.condition}"
+                colour: "${?args.colour}"
+                gender: "${?args.gender}"
+                product_type: "${?args.type}"
+                variant_set: "${?num:args.variant-set}"
+                address: "${?args.address}"
+                geo_position_lat: "${?num:args.lat}"
+                geo_position_lng: "${?num:args.lng}"
+                age: "${?args.age}"
+                style: "${?args.style}"
+                source: "${?args.source}"
+                quantity: "${?num:args.quantity}"
+                # Size lives in the variants map ({ <member-id>: count }), so it
+                # is sent whole or not at all: the `:+` guard keys the entry off
+                # the resolved variant, and an empty map would clear the size.
+                "${args.variant:+variants}":
+                  "${args.variant}": 1
+                # Shipping is one block on the wire too — sent only when
+                # --parcel-size is passed, so a price edit can't reset it.
+                "${args.parcel-size:+shipping_methods}":
+                  - payer: buyer
+                    parcel_size: "${args.parcel-size}"
+                    shipping_provider_id: USPS
+                    ship_from_address_id: "${?num:args.address-id}"
+      responses:
+        "200": { description: Listing updated. }
+
   /presentation/api/v1/listing/products/:
     post:
       operationId: createListing
@@ -364,6 +480,16 @@ paths:
       summary: Create the listing (final step of the list workflow).
       responses:
         "201": { description: Listing created. }
+
+  /presentation/api/v1/listing/products/{id}/:
+    patch:
+      operationId: updateListing
+      x-mastro-hidden: true
+      summary: Update the listing (single step of the update workflow).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Listing updated. }
 
   /api/v4/pictures/:
     post:
