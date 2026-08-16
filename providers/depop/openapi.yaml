@@ -251,7 +251,6 @@ paths:
             x-mastro-resolve: { from: "file:reference/department_gender.json", keyed: true,
                                 key_template: "${args.department}" } }
         - { name: parcel-size, description: "small/medium/large/xl/xxl (default medium)" }
-        - { name: no-boost, description: "disable the free boost", boolean: true }
       x-mastro-workflow:
         result: createListing
         steps:
@@ -341,7 +340,11 @@ paths:
                 age: "${args.age|[]}"
                 style: "${args.style|[]}"
                 source: "${args.source|[]}"
-                boost: { status: active }
+                # Boost is pinned OFF. mastro never enables a paid/free boost on
+                # a listing by itself; making it a real choice is separate work,
+                # and until then the safe value is the one that costs nothing and
+                # surprises nobody. Do not template this off a flag.
+                boost: { status: inactive }
                 variant_set: "${num:args.variant-set}"
                 # Size mapping: variants is { <member-id>: quantity }. The runner
                 # drops object entries whose key resolves empty, so a one-size
@@ -357,6 +360,195 @@ paths:
       responses:
         "201": { description: Listing created. }
 
+  # =========================================================================
+  # Update a listing — reverse-engineered from a real edit captured on
+  # depop.com (2026-08-13, listing 864568398 via the seller edit form).
+  #
+  # The web app REPLACES the listing. It reads the whole product, then PUTs the
+  # whole object back with every field present, picture_ids included:
+  #
+  #   PUT https://webapi.depop.com/presentation/api/v1/products/by-slug/<slug>/
+  #   -> 204 No Content (empty body)
+  #
+  # Keyed by SLUG, not by the numeric product id. There is no partial write, so
+  # this flow reads the listing first and merges the user's flags over it
+  # (request.base). Anything omitted from a PUT is cleared, which is why the
+  # base carries picture_ids: an edit that forgot them would drop every photo.
+  #
+  # The read does not echo the write's field names. The capture settled these:
+  #   variant_set_id                    -> variant_set
+  #   shipping_methods[].parcel_size_id -> shipping_methods[].parcel_size
+  #   pictures[{id}]                    -> picture_ids[]
+  #   location                          -> address
+  #   pricing.original_price.total_price-> price_amount
+  #   pricing.currency                  -> price_currency
+  #
+  # address / geo_position_* are absent from the read entirely. The web app
+  # recomputes them from the listing's country against its own static countries
+  # asset, so this flow does the same from reference/country_geo.json. Depop's
+  # own edit form therefore resets a listing's coordinates to the country
+  # centroid on every save; matching that is matching reality.
+  #
+  # No boost field appears in an edit payload at all. Boosting is a separate
+  # endpoint (/presentation/api/v1/boost/shop/) that mastro never calls.
+  #
+  # Not editable here, and why:
+  #   photos       picture_ids are preserved verbatim; replacing them needs the
+  #                upload pipeline and is tracked separately.
+  #   parcel size  national_shipping_cost is derived from it by Depop (medium ->
+  #                3.99 on the captured listing). Changing one without the other
+  #                would advertise the wrong shipping price, and picking the new
+  #                cost needs a lookup this flow cannot express yet.
+  #   is_kids      moving a listing into or out of kidswear needs is_kids sent
+  #                alongside the department, which has no mapping here yet.
+  # =========================================================================
+  /x-mastro/update:
+    post:
+      operationId: update
+      x-mastro-command: update
+      summary: Update an existing listing (all fields except photos).
+      description: >
+        Reads the listing, applies the flags you passed, and PUTs the whole
+        object back the way Depop's own edit form does. Fields you leave out
+        keep their current values. Takes the listing slug positionally, e.g.
+        `mastro depop update dudu-bear-asics-gel-1130-543c --price 110`. The
+        slug is the last path segment of the listing URL.
+      x-mastro-args:
+        - { name: slug, description: "listing slug, the last path segment of the listing URL", required: true }
+        - { name: price, description: "new numeric price, e.g. 110" }
+        # Amount and currency are one price on the listing: switching the
+        # currency alone would keep the number and silently reprice the item.
+        - { name: currency, description: "price currency, e.g. GBP", requires: [price] }
+        - { name: description, description: "listing text (include #hashtags inline, max 5)" }
+        - { name: brand, description: "brand slug, e.g. onitsuka-tiger" }
+        - { name: condition, description: "item condition",
+            enum: [brand_new, used_like_new, used_excellent, used_good, used_fair] }
+        - { name: colour, description: "colour (repeatable, up to 2) — replaces the current colours", multiple: true }
+        # Department and product type are one category on the listing: the size
+        # set is derived from the pair, and department alone would reach the wire
+        # as nothing but a changed gender.
+        - { name: department, description: "menswear / womenswear / kidswear / everything-else", requires: [type],
+            enum: [menswear, womenswear, kidswear, everything-else] }
+        - { name: type, description: "product type, e.g. tshirts / jumpers / trainers", requires: [department] }
+        # Size travels as a variant id derived from department+type, and the
+        # stock count lives inside that same variants map, so a quantity change
+        # has to restate the size it belongs to.
+        - { name: size, description: "human size, e.g. M", requires: [department, type] }
+        - { name: quantity, description: "stock count for the size being set", requires: [size] }
+        - { name: age, description: "e.g. y2k (repeatable, up to 1)", multiple: true }
+        - { name: style, description: "e.g. streetwear (repeatable, up to 3)", multiple: true }
+        - { name: source, description: "e.g. preloved (repeatable, up to 2)", multiple: true }
+        # Location is one group on the wire. Left alone, it stays at whatever
+        # the listing's country resolves to, exactly as the web form sets it.
+        - { name: address, description: 'e.g. "San Francisco, United States"', requires: [lat, lng] }
+        - { name: lat, description: "geo latitude", requires: [address, lng] }
+        - { name: lng, description: "geo longitude", requires: [address, lat] }
+        - { name: address-id, description: "ship-from address id (the rest of the shipping block is kept)" }
+        # Derived exactly as in the list workflow: department/type → size set,
+        # then size set + size → the variant member id, and department → gender.
+        - { name: variant-set, description: "size set id (derived from department/type)",
+            x-mastro-resolve: { from: "file:reference/categories.json", keyed: true, value_path: size_set_us,
+                                key_template: "${args.department}/${args.type}" } }
+        - { name: variant, description: "size variant id (derived from size set + size)",
+            x-mastro-resolve: { from: "file:reference/size_variants.json", keyed: true,
+                                key_template: "${args.variant-set}/${args.size}" } }
+        - { name: gender, description: "male / female / unisex (derived from department)",
+            x-mastro-resolve: { from: "file:reference/department_gender.json", keyed: true,
+                                key_template: "${args.department}" } }
+      x-mastro-workflow:
+        # The PUT answers 204 with no body, so the command returns a fresh read
+        # of the listing instead: confirmation of what it now looks like.
+        result: verify
+        steps:
+          # 1. Read the listing exactly as the edit form does.
+          - id: current
+            operationId: getListingForEdit
+            request:
+              url: "https://webapi.depop.com/presentation/api/v1/products/by-slug/${args.slug}/edit-listing/"
+
+          # 2. The write wants bare picture ids; the read gives objects.
+          #    Preserving these is what keeps an edit from wiping the photos.
+          - id: pictureIds
+            foreach: "${steps.current.pictures}"
+            value: "${item.id}"
+
+          # 3. Depop's own country -> address/coordinates table, indexed below by
+          #    the listing's own country (which is only known after step 1).
+          - id: countryGeo
+            file: "reference/country_geo.json"
+
+          # 4. Replace the listing: base is what it is now, body is the change.
+          - id: updateListing
+            operationId: updateListing
+            request:
+              url: "https://webapi.depop.com/presentation/api/v1/products/by-slug/${args.slug}/"
+              # No flags means no edit. Refuse rather than rewrite the listing
+              # with itself.
+              require_body: true
+              base:
+                description: "${steps.current.description}"
+                brand: "${steps.current.brand}"
+                condition: "${steps.current.condition}"
+                colour: "${steps.current.colour}"
+                style: "${steps.current.style}"
+                age: "${steps.current.age}"
+                source: "${steps.current.source}"
+                gender: "${steps.current.gender}"
+                is_kids: "${steps.current.is_kids}"
+                product_type: "${steps.current.product_type}"
+                variant_set: "${steps.current.variant_set_id}"
+                variants: "${steps.current.variants}"
+                picture_ids: "${steps.pictureIds}"
+                price_amount: "${steps.current.pricing.original_price.total_price}"
+                price_currency: "${steps.current.pricing.currency}"
+                national_shipping_cost: "${steps.current.national_shipping_cost}"
+                country: "${steps.current.country}"
+                address: "${steps.countryGeo.${steps.current.country}.address}"
+                geo_position_lat: "${steps.countryGeo.${steps.current.country}.geoLat}"
+                geo_position_lng: "${steps.countryGeo.${steps.current.country}.geoLng}"
+                attributes: "${steps.current.attributes|{}}"
+                # Guarded on the listing actually having a shipping block, so a
+                # listing without one doesn't get an empty one invented for it.
+                "${steps.current.shipping_methods.0.payer:+shipping_methods}":
+                  - payer: "${steps.current.shipping_methods.0.payer}"
+                    parcel_size: "${steps.current.shipping_methods.0.parcel_size_id}"
+                    shipping_provider_id: "${steps.current.shipping_methods.0.shipping_provider_id}"
+                    ship_from_address_id: "${steps.current.shipping_methods.0.ship_from_address_id}"
+              body:
+                description: "${?args.description}"
+                brand: "${?args.brand}"
+                condition: "${?args.condition}"
+                colour: "${?args.colour}"
+                style: "${?args.style}"
+                age: "${?args.age}"
+                source: "${?args.source}"
+                gender: "${?args.gender}"
+                product_type: "${?args.type}"
+                variant_set: "${?num:args.variant-set}"
+                price_amount: "${?args.price}"
+                price_currency: "${?args.currency}"
+                address: "${?args.address}"
+                geo_position_lat: "${?num:args.lat}"
+                geo_position_lng: "${?num:args.lng}"
+                # Size and stock live in one map, sent whole or not at all.
+                "${args.variant:+variants}":
+                  "${args.variant}": "${num:args.quantity|1}"
+                # Only the ship-from address is editable here; the rest of the
+                # block is carried over so a change can't reset the parcel size.
+                "${args.address-id:+shipping_methods}":
+                  - payer: "${steps.current.shipping_methods.0.payer}"
+                    parcel_size: "${steps.current.shipping_methods.0.parcel_size_id}"
+                    shipping_provider_id: "${steps.current.shipping_methods.0.shipping_provider_id}"
+                    ship_from_address_id: "${num:args.address-id}"
+
+          # 5. Read it back, since the PUT itself says nothing.
+          - id: verify
+            operationId: getListingForEdit
+            request:
+              url: "https://webapi.depop.com/presentation/api/v1/products/by-slug/${args.slug}/edit-listing/"
+      responses:
+        "204": { description: Listing replaced. }
+
   /presentation/api/v1/listing/products/:
     post:
       operationId: createListing
@@ -364,6 +556,35 @@ paths:
       summary: Create the listing (final step of the list workflow).
       responses:
         "201": { description: Listing created. }
+
+  # The two halves of an edit, both keyed by slug and both on the webapi host.
+  /presentation/api/v1/products/by-slug/{slug}/edit-listing/:
+    get:
+      operationId: getListingForEdit
+      x-mastro-hidden: true
+      summary: Read a listing the way the seller edit form does.
+      description: >
+        The read half of an edit. Returns the listing's current field values,
+        which the update workflow merges the user's changes into. Note the read
+        and write field names differ (variant_set_id vs variant_set, pictures vs
+        picture_ids); the update workflow maps between them.
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: The listing as the edit form sees it. }
+
+  /presentation/api/v1/products/by-slug/{slug}/:
+    put:
+      operationId: updateListing
+      x-mastro-hidden: true
+      summary: Replace the listing (the write half of the update workflow).
+      description: >
+        Replaces the whole product. Every field must be present or it is
+        cleared, picture_ids included. Answers 204 with no body.
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Listing replaced. No body. }
 
   /api/v4/pictures/:
     post:

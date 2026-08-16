@@ -179,6 +179,7 @@ export class Connector {
       authHeaders: () => this.authHeaders(),
       baseContext: () => this.authContext(),
       apiTransport: () => this.getTransport(),
+      loadFile: (relPath) => JSON.parse(readFileSync(join(this.provider.dir, relPath), "utf8")),
       dryRun: opts.dryRun ?? false,
     });
     return runner.run(op, resolved);

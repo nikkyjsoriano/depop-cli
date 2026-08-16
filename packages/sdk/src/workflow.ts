@@ -28,9 +28,17 @@ import { FetchTransport, type Transport } from "./transport.ts";
 import { getPath, metaRefreshUrl, parseMaybeJson, sleep } from "./util.ts";
 
 export class WorkflowError extends Error {
-  constructor(public readonly step: string, message: string) {
+  /**
+   * Set for a failure the caller can fix by re-running with different flags (as
+   * opposed to a remote failure). The CLI reads `exitCode` off any error, so
+   * this exits 2 like a UsageError instead of 1.
+   */
+  readonly exitCode?: number;
+
+  constructor(public readonly step: string, message: string, opts: { usage?: boolean } = {}) {
     super(`workflow step "${step}": ${message}`);
     this.name = "WorkflowError";
+    if (opts.usage) this.exitCode = 2;
   }
 }
 
@@ -42,6 +50,8 @@ export interface WorkflowDeps {
   baseContext(): TemplateContext;
   /** Transport for authenticated, possibly-challenged API calls (browser/curl). */
   apiTransport(): Promise<Transport>;
+  /** Loads a JSON file bundled in the provider directory (for `file` steps). */
+  loadFile?(relativePath: string): unknown;
   /** When true, build the planned requests but don't send them. */
   dryRun?: boolean;
 }
@@ -125,6 +135,18 @@ export class WorkflowRunner {
 
   /** One request (with optional poll loop) and its output extraction. */
   private async executeOnce(step: WorkflowStep, ctx: () => TemplateContext): Promise<unknown> {
+    // A `file` step makes no HTTP call either: it loads bundled reference data
+    // so a later step can index it by something only known at run time.
+    if (step.file) {
+      if (!this.deps.loadFile) throw new WorkflowError(step.id, "no file loader configured");
+      // Load it even in dry-run, so a missing or unparseable file fails at plan
+      // time. The result is still a stub there: reference data is usually
+      // indexed by a value from an earlier step, which is itself a stub, and a
+      // real lookup against a placeholder key would fail strict templating.
+      const data = this.deps.loadFile(step.file);
+      return this.deps.dryRun ? stepStub() : this.applyOutput(step, data);
+    }
+
     // A step with no operationId is a pure transform: it makes no HTTP call and
     // just shapes its `value` (templated) through `output` (path/extract/coerce).
     // Used to derive one step's data from another (e.g. picture ids from slot
@@ -172,9 +194,23 @@ export class WorkflowRunner {
       for (const [k, v] of Object.entries(req.headers)) headers[k] = renderTemplateString(v, c, this.opts());
     }
 
-    const body = req.form
-      ? await this.buildFormBody(step, req.form, headers, c)
-      : this.buildBody(req.body, headers, c);
+    const built = req.form
+      ? { body: await this.buildFormBody(step, req.form, headers, c), changed: true }
+      : this.buildBody(req.body, headers, c, req.base);
+    const body = built.body;
+
+    // Every field of an edit is optional, so "no flags passed" and "flags that
+    // all resolved to nothing" both come out as no change at all. Sending that
+    // would write at the remote resource and report success, so a step can
+    // declare it has nothing to say. With a `base` the test is whether the user
+    // changed anything, not whether the payload is empty: a replacing PUT always
+    // carries the whole resource. Checked before the dry-run branch, so a
+    // preview fails the same way a live run does.
+    if (req.require_body && !built.changed) {
+      throw new WorkflowError(step.id, "nothing to send: no field to change was supplied", {
+        usage: true,
+      });
+    }
 
     if (this.deps.dryRun) {
       this.planned.push({ step: step.id, method, url, headers: redactAuth(headers), body: previewBody(body) });
@@ -226,8 +262,29 @@ export class WorkflowRunner {
     bodyTemplate: unknown,
     headers: Record<string, string>,
     ctx: TemplateContext,
-  ): string | Uint8Array<ArrayBuffer> | undefined {
-    if (bodyTemplate === undefined) return undefined;
+    baseTemplate?: unknown,
+  ): { body: string | Uint8Array<ArrayBuffer> | undefined; changed: boolean } {
+    // Read-modify-write: the base is the resource as it stands (from an earlier
+    // step), the body is the change. Merging top-level key by key means a field
+    // the user didn't pass keeps the value the resource already has, which is
+    // what makes a replacing endpoint safe to drive with a partial command.
+    if (baseTemplate !== undefined) {
+      const base = renderDeep(baseTemplate, ctx, this.opts());
+      const changes = bodyTemplate === undefined ? {} : renderDeep(bodyTemplate, ctx, this.opts());
+      if (!isPlainObject(base)) {
+        throw new Error("workflow request.base must resolve to an object");
+      }
+      if (!isPlainObject(changes)) {
+        throw new Error("workflow request.body must resolve to an object when base is set");
+      }
+      if (!headers["content-type"]) headers["content-type"] = "application/json";
+      return {
+        body: JSON.stringify({ ...base, ...changes }),
+        changed: Object.keys(changes).length > 0,
+      };
+    }
+
+    if (bodyTemplate === undefined) return { body: undefined, changed: false };
 
     if (typeof bodyTemplate === "string") {
       const file = bodyTemplate.match(/^\$\{file:(.+)\}$/);
@@ -237,14 +294,16 @@ export class WorkflowRunner {
         // gives a literal filename, not a templated field that could be typo'd).
         const path = renderTemplateString(`\${${file[1]!.trim()}}`, ctx, { strict: false });
         const bytes = readFileSync(path);
-        return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        return { body: new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength), changed: true };
       }
-      return renderTemplateString(bodyTemplate, ctx, this.opts());
+      const rendered = renderTemplateString(bodyTemplate, ctx, this.opts());
+      return { body: rendered, changed: rendered !== "" };
     }
 
     const rendered = renderDeep(bodyTemplate, ctx, this.opts());
     if (!headers["content-type"]) headers["content-type"] = "application/json";
-    return JSON.stringify(rendered);
+    const json = JSON.stringify(rendered);
+    return { body: json, changed: !isEmptyBody(json) };
   }
 
   /**
@@ -299,6 +358,10 @@ export class WorkflowRunner {
 
 // -- helpers ----------------------------------------------------------------
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
 function asArray(v: unknown): unknown[] {
   if (v === undefined || v === null) return [];
   return Array.isArray(v) ? v : [v];
@@ -334,6 +397,14 @@ function stepStub(): unknown {
       },
     },
   );
+}
+
+/**
+ * Nothing to say: no body at all, an object whose every field dropped, or a
+ * string template that rendered to nothing. Used by `require_body` steps.
+ */
+function isEmptyBody(body: string | Uint8Array<ArrayBuffer> | undefined): boolean {
+  return body === undefined || body === "" || body === "{}";
 }
 
 /** Mask sensitive headers in a dry-run preview. */

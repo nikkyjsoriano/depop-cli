@@ -123,5 +123,9 @@ function flagHelp(f: CliFlag): string {
   const repeat = f.multiple ? pc.dim(" [repeatable]") : "";
   const choiceHint = f.enum?.length ? pc.dim(` {${f.enum.join(", ")}}`) : "";
   const resolveHint = f.resolvable ? pc.dim(" [accepts id or label]") : "";
-  return `--${f.name.padEnd(16)} ${pc.dim(f.description ?? "")}${choiceHint}${resolveHint}${req}${repeat}`;
+  // Show a flag's partners here, not just in the error you get for omitting them.
+  const needsHint = f.requires?.length
+    ? pc.dim(` [needs ${f.requires.map((r) => `--${r}`).join(" ")}]`)
+    : "";
+  return `--${f.name.padEnd(16)} ${pc.dim(f.description ?? "")}${choiceHint}${resolveHint}${needsHint}${req}${repeat}`;
 }

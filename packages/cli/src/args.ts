@@ -20,6 +20,8 @@ export interface CliFlag {
   multiple: boolean;
   boolean: boolean;
   enum?: string[];
+  /** Flags that must be passed alongside this one (see WorkflowArg.requires). */
+  requires?: string[];
   /** True if values are resolved from a taxonomy (so we skip enum validation). */
   resolvable: boolean;
 }
@@ -51,6 +53,7 @@ export function flagFromWorkflowArg(a: WorkflowArg): CliFlag {
     multiple: a.multiple ?? false,
     boolean: a.boolean ?? false,
     enum: a.enum,
+    requires: a.requires,
     resolvable: a["x-mastro-resolve"] !== undefined,
   };
 }
@@ -91,9 +94,13 @@ export function parseArgs(tokens: string[], flags: CliFlag[] = []): ParsedArgs {
       }
     }
 
-    if (repeatable.has(name)) {
+    // A repeatable flag collects its values into a list. A *valueless* one has
+    // nothing to collect, so keep the bare boolean rather than stringifying it
+    // into the list, where `--colour` with no value would read as the colour
+    // "true"; validation then reports the missing value.
+    if (repeatable.has(name) && typeof value === "string") {
       const existing = out[name];
-      out[name] = Array.isArray(existing) ? [...existing, String(value)] : [String(value)];
+      out[name] = Array.isArray(existing) ? [...existing, value] : [value];
     } else {
       out[name] = value;
     }
@@ -104,11 +111,14 @@ export function parseArgs(tokens: string[], flags: CliFlag[] = []): ParsedArgs {
 
 /**
  * Validate args against the flag specs and coerce into the `{ name → value }`
- * map the connector/workflow consumes. Enforces `required` and `enum`.
+ * map the connector/workflow consumes. Enforces `required`, `enum`, and
+ * `requires` (flags that only mean something together).
  */
 export function buildArgsMap(parsed: ParsedArgs, flags: CliFlag[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const missing: string[] = [];
+
+  validateKnown(parsed, flags);
 
   for (const flag of flags) {
     const value = parsed.flags[flag.name];
@@ -116,6 +126,7 @@ export function buildArgsMap(parsed: ParsedArgs, flags: CliFlag[]): Record<strin
       if (flag.required) missing.push(flag.name);
       continue;
     }
+    validateValued(flag, value);
     validateEnum(flag, value);
     out[flag.name] = flag.multiple && !Array.isArray(value) ? [value] : value;
   }
@@ -123,7 +134,59 @@ export function buildArgsMap(parsed: ParsedArgs, flags: CliFlag[]): Record<strin
   if (missing.length > 0) {
     throw new UsageError(`missing required flag(s): ${missing.map((m) => `--${m}`).join(", ")}`);
   }
+  validateRequires(out, flags);
   return out;
+}
+
+/**
+ * A flag the operation doesn't declare goes nowhere: an args map only carries
+ * declared names, so a typo'd `--descriptionn` would be dropped and the command
+ * would report success on an edit that never included it. The global flags
+ * (`--json`, `--dry-run`, `--help`) are stripped before parsing, so anything
+ * left here really is unknown.
+ */
+function validateKnown(parsed: ParsedArgs, flags: CliFlag[]): void {
+  const declared = new Set(flags.map((f) => f.name));
+  const unknown = Object.keys(parsed.flags).filter((name) => !declared.has(name));
+  if (unknown.length > 0) {
+    throw new UsageError(
+      `unknown flag(s): ${unknown.map((u) => `--${u}`).join(", ")}. ` +
+        `Run the command with --help to see what it takes.`,
+    );
+  }
+}
+
+/**
+ * A flag separated from its partners is either a silent no-op (a size that
+ * never resolves to a variant id, a ship-from address with no shipping block to
+ * sit in) or a half-change (a currency without the amount it belongs to). Say
+ * so rather than sending the request and reporting success.
+ */
+function validateRequires(supplied: Record<string, unknown>, flags: CliFlag[]): void {
+  for (const flag of flags) {
+    if (supplied[flag.name] === undefined || !flag.requires?.length) continue;
+    const absent = flag.requires.filter((name) => supplied[name] === undefined);
+    if (absent.length > 0) {
+      throw new UsageError(
+        `--${flag.name} needs ${absent.map((m) => `--${m}`).join(", ")} as well. ` +
+          `These flags only work as a set.`,
+      );
+    }
+  }
+}
+
+/**
+ * A value flag left without one parses as the bare boolean `true` — which is
+ * easy to do by accident, because the global flags are stripped before parsing
+ * (`--price --dry-run` leaves `--price` last) and a value that itself starts
+ * with `--` reads as the next flag. Sending `"price_amount": true` at a live
+ * listing is the wrong answer; say what's missing instead.
+ */
+function validateValued(flag: CliFlag, value: string | boolean | string[]): void {
+  if (flag.boolean || typeof value !== "boolean") return;
+  throw new UsageError(
+    `--${flag.name} needs a value. Use --${flag.name}=<value> if the value starts with "--".`,
+  );
 }
 
 function validateEnum(flag: CliFlag, value: string | boolean | string[]): void {

@@ -1,0 +1,1187 @@
+{
+  "AF": {
+    "address": "Afghanistan",
+    "geoLat": 33.8388058603423,
+    "geoLng": 66.0264709817607
+  },
+  "DZ": {
+    "address": "Algeria",
+    "geoLat": 28.1632395923063,
+    "geoLng": 2.63238813336793
+  },
+  "AS": {
+    "address": "American Samoa",
+    "geoLat": -14.304405426733,
+    "geoLng": -170.707833250312
+  },
+  "AD": {
+    "address": "Andorra",
+    "geoLat": 42.5486542501806,
+    "geoLng": 1.57676643468505
+  },
+  "AO": {
+    "address": "Angola",
+    "geoLat": -12.0993951347033,
+    "geoLng": 17.912292115939
+  },
+  "AI": {
+    "address": "Anguilla",
+    "geoLat": 18.1945854999999,
+    "geoLng": -63.0818298
+  },
+  "AQ": {
+    "address": "Antarctica",
+    "geoLat": -72.822042,
+    "geoLng": 0
+  },
+  "AG": {
+    "address": "Antigua & Barbuda",
+    "geoLat": 17.11793422,
+    "geoLng": -61.84387674
+  },
+  "AR": {
+    "address": "Argentina",
+    "geoLat": -36.252002,
+    "geoLng": -63.954193
+  },
+  "AM": {
+    "address": "Armenia",
+    "geoLat": 40.6056564938472,
+    "geoLng": 44.6603948347298
+  },
+  "AW": {
+    "address": "Aruba",
+    "geoLat": 12.5156286858793,
+    "geoLng": -69.9756409523066
+  },
+  "AC": {
+    "address": "Ascension Island",
+    "geoLat": 64.9975884448459,
+    "geoLng": -18.6054668169534
+  },
+  "AU": {
+    "address": "Australia",
+    "geoLat": -25.7349684916223,
+    "geoLng": 134.489562606981
+  },
+  "AT": {
+    "address": "Austria",
+    "geoLat": 47.6077978292689,
+    "geoLng": 14.3001435907641
+  },
+  "AZ": {
+    "address": "Azerbaijan",
+    "geoLat": 40.418259613178,
+    "geoLng": 47.720341220495
+  },
+  "BS": {
+    "address": "Bahamas",
+    "geoLat": 25.07471,
+    "geoLng": -77.3408
+  },
+  "BH": {
+    "address": "Bahrain",
+    "geoLat": 26.0224069941867,
+    "geoLng": 50.5596439032492
+  },
+  "BD": {
+    "address": "Bangladesh",
+    "geoLat": 24.3476077999364,
+    "geoLng": 90.0779740421191
+  },
+  "BB": {
+    "address": "Barbados",
+    "geoLat": 13.1787146900535,
+    "geoLng": -59.5619546611369
+  },
+  "BE": {
+    "address": "Belgium",
+    "geoLat": 50.438696,
+    "geoLng": 4.63357500000001
+  },
+  "BZ": {
+    "address": "Belize",
+    "geoLat": 17.2168536428077,
+    "geoLng": -88.686006535616
+  },
+  "BJ": {
+    "address": "Benin",
+    "geoLat": 10.3383829799812,
+    "geoLng": 2.42667424920265
+  },
+  "BM": {
+    "address": "Bermuda",
+    "geoLat": 32.3179203152518,
+    "geoLng": -64.7370103996652
+  },
+  "BT": {
+    "address": "Bhutan",
+    "geoLat": 27.415414814619,
+    "geoLng": 90.4294341148677
+  },
+  "BO": {
+    "address": "Bolivia",
+    "geoLat": -16.9706623441227,
+    "geoLng": -64.2696051242704
+  },
+  "BA": {
+    "address": "Bosnia & Herzegovina",
+    "geoLat": 44.168115060358,
+    "geoLng": 17.7865310090801
+  },
+  "BW": {
+    "address": "Botswana",
+    "geoLat": -22.2129427788611,
+    "geoLng": 24.3162647690614
+  },
+  "BV": {
+    "address": "Bouvet Island",
+    "geoLat": -54.43333,
+    "geoLng": 3.4
+  },
+  "BR": {
+    "address": "Brazil",
+    "geoLat": -9.58890301712257,
+    "geoLng": -51.6197890205486
+  },
+  "IO": {
+    "address": "British Indian Ocean Territory",
+    "geoLat": -7.26059464,
+    "geoLng": 72.37749449
+  },
+  "VG": {
+    "address": "British Virgin Islands",
+    "geoLat": 18.42692843,
+    "geoLng": -64.62317233
+  },
+  "BN": {
+    "address": "Brunei",
+    "geoLat": 4.56546705389121,
+    "geoLng": 114.562410992128
+  },
+  "BG": {
+    "address": "Bulgaria",
+    "geoLat": 42.7613767127692,
+    "geoLng": 25.2315070071904
+  },
+  "BF": {
+    "address": "Burkina Faso",
+    "geoLat": 12.2779295146076,
+    "geoLng": -1.57306231994955
+  },
+  "BI": {
+    "address": "Burundi",
+    "geoLat": -3.5324543338914,
+    "geoLng": 29.8871461223835
+  },
+  "KH": {
+    "address": "Cambodia",
+    "geoLat": 12.4576331842438,
+    "geoLng": 104.923981338048
+  },
+  "CM": {
+    "address": "Cameroon",
+    "geoLat": 4.80651220617253,
+    "geoLng": 12.2137541551234
+  },
+  "CA": {
+    "address": "Canada",
+    "geoLat": 55.5859012851966,
+    "geoLng": -105.750595856519
+  },
+  "IC": {
+    "address": "Canary Islands",
+    "geoLat": 64.9975884448459,
+    "geoLng": -18.6054668169534
+  },
+  "CV": {
+    "address": "Cape Verde",
+    "geoLat": 14.918,
+    "geoLng": -23.509
+  },
+  "BQ": {
+    "address": "Caribbean Netherlands",
+    "geoLat": 12.18333,
+    "geoLng": -68.23333
+  },
+  "KY": {
+    "address": "Cayman Islands",
+    "geoLat": 19.3086622401692,
+    "geoLng": -81.2384511989646
+  },
+  "CF": {
+    "address": "Central African Republic",
+    "geoLat": 6.57134078462119,
+    "geoLng": 20.4828261100212
+  },
+  "EA": {
+    "address": "Ceuta & Melilla",
+    "geoLat": 35.2711,
+    "geoLng": 2.9324
+  },
+  "TD": {
+    "address": "Chad",
+    "geoLat": 15.3611667142703,
+    "geoLng": 18.6644791159188
+  },
+  "CL": {
+    "address": "Chile",
+    "geoLat": -26.783346,
+    "geoLng": -69.761008
+  },
+  "CX": {
+    "address": "Christmas Island",
+    "geoLat": -10.4878279000001,
+    "geoLng": 105.6329821
+  },
+  "CP": {
+    "address": "Clipperton Island",
+    "geoLat": 64.9975884448459,
+    "geoLng": -18.6054668169534
+  },
+  "CC": {
+    "address": "Cocos (Keeling) Islands",
+    "geoLat": -12.18785286,
+    "geoLng": 96.83103701
+  },
+  "CO": {
+    "address": "Colombia",
+    "geoLat": 3.06508799999999,
+    "geoLng": -73.129056
+  },
+  "KM": {
+    "address": "Comoros",
+    "geoLat": -11.70198978,
+    "geoLng": 43.2541677
+  },
+  "CK": {
+    "address": "Cook Islands",
+    "geoLat": -21.2368447000001,
+    "geoLng": -159.7711563
+  },
+  "CR": {
+    "address": "Costa Rica",
+    "geoLat": 10.2577944410312,
+    "geoLng": -84.2009147613538
+  },
+  "HR": {
+    "address": "Croatia",
+    "geoLat": 45.6649521968376,
+    "geoLng": 16.6791068850861
+  },
+  "CW": {
+    "address": "Curaçao",
+    "geoLat": 12.178308183856,
+    "geoLng": -68.9817448480808
+  },
+  "CY": {
+    "address": "Cyprus",
+    "geoLat": 35.0458816072997,
+    "geoLng": 33.2217624140819
+  },
+  "CZ": {
+    "address": "Czechia",
+    "geoLat": 49.8175,
+    "geoLng": 15.473
+  },
+  "DK": {
+    "address": "Denmark",
+    "geoLat": 55.9633978748347,
+    "geoLng": 10.0462968058278
+  },
+  "DG": {
+    "address": "Diego Garcia",
+    "geoLat": -7.3195,
+    "geoLng": 72.422859
+  },
+  "DJ": {
+    "address": "Djibouti",
+    "geoLat": 11.7496765333164,
+    "geoLng": 42.5777653608456
+  },
+  "DM": {
+    "address": "Dominica",
+    "geoLat": 18.6062576970524,
+    "geoLng": -70.1067224933053
+  },
+  "DO": {
+    "address": "Dominican Republic",
+    "geoLat": 18.6062576970524,
+    "geoLng": -70.1067224933053
+  },
+  "EC": {
+    "address": "Ecuador",
+    "geoLat": -1.16017132420716,
+    "geoLng": -78.4329147227382
+  },
+  "EG": {
+    "address": "Egypt",
+    "geoLat": 26.4941838299718,
+    "geoLng": 29.871903452398
+  },
+  "SV": {
+    "address": "El Salvador",
+    "geoLat": 13.7368969076932,
+    "geoLng": -88.8665114518297
+  },
+  "GQ": {
+    "address": "Equatorial Guinea",
+    "geoLat": 1.61213015485833,
+    "geoLng": 10.5257705053847
+  },
+  "ER": {
+    "address": "Eritrea",
+    "geoLat": 15.6805129748268,
+    "geoLng": 38.584156324299
+  },
+  "EE": {
+    "address": "Estonia",
+    "geoLat": 58.7783968568071,
+    "geoLng": 25.7615268448868
+  },
+  "ET": {
+    "address": "Ethiopia",
+    "geoLat": 8.62621960079895,
+    "geoLng": 39.6160319910272
+  },
+  "FK": {
+    "address": "Falkland Islands",
+    "geoLat": -51.69302404,
+    "geoLng": -57.87147544
+  },
+  "FO": {
+    "address": "Faroe Islands",
+    "geoLat": 62.0310655277591,
+    "geoLng": -6.88410945710822
+  },
+  "FJ": {
+    "address": "Fiji",
+    "geoLat": -18.1456,
+    "geoLng": 178.4406
+  },
+  "FI": {
+    "address": "Finland",
+    "geoLat": 62.7777539652943,
+    "geoLng": 26.199539005192
+  },
+  "FR": {
+    "address": "France",
+    "geoLat": 47.8249046208979,
+    "geoLng": 2.61878695312962
+  },
+  "GF": {
+    "address": "French Guiana",
+    "geoLat": 4.35792079157208,
+    "geoLng": -53.1743920884317
+  },
+  "PF": {
+    "address": "French Polynesia",
+    "geoLat": -17.53812232,
+    "geoLng": -149.56466734
+  },
+  "TF": {
+    "address": "French Southern Territories",
+    "geoLat": -49.34904359,
+    "geoLng": 70.21919669
+  },
+  "GA": {
+    "address": "Gabon",
+    "geoLat": -0.590945177481755,
+    "geoLng": 11.7972366735751
+  },
+  "GM": {
+    "address": "Gambia",
+    "geoLat": 13.4445255191194,
+    "geoLng": -15.912854478675
+  },
+  "GE": {
+    "address": "Georgia",
+    "geoLat": 42.1763109186415,
+    "geoLng": 43.5174484608787
+  },
+  "DE": {
+    "address": "Germany",
+    "geoLat": 51.1334813439932,
+    "geoLng": 10.0183432948567
+  },
+  "GH": {
+    "address": "Ghana",
+    "geoLat": 6.88085426914622,
+    "geoLng": -1.16759442759906
+  },
+  "GI": {
+    "address": "Gibraltar",
+    "geoLat": 36.14087689,
+    "geoLng": -5.35457429
+  },
+  "GR": {
+    "address": "Greece",
+    "geoLat": 38.5890212896367,
+    "geoLng": 23.8285537394706
+  },
+  "GL": {
+    "address": "Greenland",
+    "geoLat": 74.7209117556808,
+    "geoLng": -41.3894770446402
+  },
+  "GD": {
+    "address": "Grenada",
+    "geoLat": 12.1129258398845,
+    "geoLng": -61.6793774505556
+  },
+  "GP": {
+    "address": "Guadeloupe",
+    "geoLat": 15.99454009,
+    "geoLng": -61.72715035
+  },
+  "GU": {
+    "address": "Guam",
+    "geoLat": 13.4435651676475,
+    "geoLng": 144.775596791471
+  },
+  "GT": {
+    "address": "Guatemala",
+    "geoLat": 15.6055893260292,
+    "geoLng": -90.3900017126126
+  },
+  "GG": {
+    "address": "Guernsey",
+    "geoLat": 49.45828447,
+    "geoLng": -2.57336491
+  },
+  "GN": {
+    "address": "Guinea",
+    "geoLat": 10.7855460398783,
+    "geoLng": -11.0298621655307
+  },
+  "GW": {
+    "address": "GuineaBissau",
+    "geoLat": 11.803749,
+    "geoLng": -15.180413
+  },
+  "GY": {
+    "address": "Guyana",
+    "geoLat": 5.62382279034036,
+    "geoLng": -58.9747808781477
+  },
+  "HT": {
+    "address": "Haiti",
+    "geoLat": 19.1824357256899,
+    "geoLng": -72.434514974505
+  },
+  "HM": {
+    "address": "Heard & McDonald Islands",
+    "geoLat": -53.08915,
+    "geoLng": 73.51267
+  },
+  "HN": {
+    "address": "Honduras",
+    "geoLat": 14.7616644478253,
+    "geoLng": -86.9216408872841
+  },
+  "HK": {
+    "address": "Hong Kong (China)",
+    "geoLat": 22.27833,
+    "geoLng": 114.15861
+  },
+  "HU": {
+    "address": "Hungary",
+    "geoLat": 47.0602667471763,
+    "geoLng": 19.4993490091469
+  },
+  "IS": {
+    "address": "Iceland",
+    "geoLat": 64.9975884448459,
+    "geoLng": -18.6054668169534
+  },
+  "IN": {
+    "address": "India",
+    "geoLat": 22.1991660760527,
+    "geoLng": 78.476681027237
+  },
+  "ID": {
+    "address": "Indonesia",
+    "geoLat": -6.17555357,
+    "geoLng": 106.82721585
+  },
+  "IE": {
+    "address": "Ireland",
+    "geoLat": 53.3054943871234,
+    "geoLng": -7.73764888796793
+  },
+  "IM": {
+    "address": "Isle of Man",
+    "geoLat": 54.2290802101343,
+    "geoLng": -4.5258501593996
+  },
+  "IL": {
+    "address": "Israel",
+    "geoLat": 31.8472608144505,
+    "geoLng": 34.8419985253627
+  },
+  "IT": {
+    "address": "Italy",
+    "geoLat": 42.5041539170675,
+    "geoLng": 12.6463610364431
+  },
+  "JM": {
+    "address": "Jamaica",
+    "geoLat": 18.1512945138,
+    "geoLng": -77.3192220134904
+  },
+  "JP": {
+    "address": "Japan",
+    "geoLat": 36.3864928218528,
+    "geoLng": 138.592229549504
+  },
+  "JE": {
+    "address": "Jersey",
+    "geoLat": 49.2184900496874,
+    "geoLng": -2.14197981414417
+  },
+  "JO": {
+    "address": "Jordan",
+    "geoLat": 31.0101920713363,
+    "geoLng": 36.4358628369717
+  },
+  "KZ": {
+    "address": "Kazakhstan",
+    "geoLat": 48.160088082685,
+    "geoLng": 67.3017735657682
+  },
+  "KE": {
+    "address": "Kenya",
+    "geoLat": 0.529862476788944,
+    "geoLng": 37.8578818658854
+  },
+  "KI": {
+    "address": "Kiribati",
+    "geoLat": 1.83893628591267,
+    "geoLng": -157.371021236442
+  },
+  "XK": {
+    "address": "Kosovo",
+    "geoLat": 42.6430165,
+    "geoLng": 20.953599
+  },
+  "KW": {
+    "address": "Kuwait",
+    "geoLat": 29.3412115743027,
+    "geoLng": 47.5906041080513
+  },
+  "KG": {
+    "address": "Kyrgyzstan",
+    "geoLat": 41.465053955426,
+    "geoLng": 74.5555962804371
+  },
+  "LA": {
+    "address": "Laos",
+    "geoLat": 19.9225890014436,
+    "geoLng": 102.593736567576
+  },
+  "LV": {
+    "address": "Latvia",
+    "geoLat": 56.9590654127872,
+    "geoLng": 24.8625932740492
+  },
+  "LS": {
+    "address": "Lesotho",
+    "geoLat": -29.5809998474103,
+    "geoLng": 28.2430108685831
+  },
+  "LY": {
+    "address": "Libya",
+    "geoLat": 27.0439610747292,
+    "geoLng": 18.0232797726029
+  },
+  "LI": {
+    "address": "Liechtenstein",
+    "geoLat": 47.1518475849904,
+    "geoLng": 9.55426914739629
+  },
+  "LT": {
+    "address": "Lithuania",
+    "geoLat": 55.4874125822773,
+    "geoLng": 23.9315379882448
+  },
+  "LU": {
+    "address": "Luxembourg",
+    "geoLat": 49.7706279766425,
+    "geoLng": 6.08781366657564
+  },
+  "MO": {
+    "address": "Macau (China)",
+    "geoLat": 35.4867029846329,
+    "geoLng": 101.901875103385
+  },
+  "MK": {
+    "address": "Macedonia",
+    "geoLat": 41.5996826646442,
+    "geoLng": 21.6974757513494
+  },
+  "MG": {
+    "address": "Madagascar",
+    "geoLat": -19.3735339420708,
+    "geoLng": 46.7059842741429
+  },
+  "MW": {
+    "address": "Malawi",
+    "geoLat": -13.2158036349607,
+    "geoLng": 33.739163883354
+  },
+  "MY": {
+    "address": "Malaysia",
+    "geoLat": 4.49664266041942,
+    "geoLng": 102.275719605501
+  },
+  "MV": {
+    "address": "Maldives",
+    "geoLat": 4.17887365,
+    "geoLng": 73.51104943
+  },
+  "ML": {
+    "address": "Mali",
+    "geoLat": 17.3503352399376,
+    "geoLng": -1.25214497310038
+  },
+  "MT": {
+    "address": "Malta",
+    "geoLat": 35.890522427978,
+    "geoLng": 14.4419213796182
+  },
+  "MH": {
+    "address": "Marshall Islands",
+    "geoLat": 7.08908689,
+    "geoLng": 171.37961868
+  },
+  "MQ": {
+    "address": "Martinique",
+    "geoLat": 14.6525485200192,
+    "geoLng": -61.0212870487474
+  },
+  "MR": {
+    "address": "Mauritania",
+    "geoLat": 19.7574723127526,
+    "geoLng": -10.5327926241955
+  },
+  "MU": {
+    "address": "Mauritius",
+    "geoLat": -20.16385665,
+    "geoLng": 57.5025125
+  },
+  "YT": {
+    "address": "Mayotte",
+    "geoLat": -12.8197956282959,
+    "geoLng": 45.1351604116082
+  },
+  "MX": {
+    "address": "Mexico",
+    "geoLat": 23.9504642310912,
+    "geoLng": -102.532867448126
+  },
+  "FM": {
+    "address": "Micronesia",
+    "geoLat": 6.90957,
+    "geoLng": 158.16183
+  },
+  "MD": {
+    "address": "Moldova",
+    "geoLat": 47.1938708692964,
+    "geoLng": 28.5741781104524
+  },
+  "MC": {
+    "address": "Monaco",
+    "geoLat": 43.73248184,
+    "geoLng": 7.4189617
+  },
+  "MN": {
+    "address": "Mongolia",
+    "geoLat": 46.8352906606684,
+    "geoLng": 103.083217801107
+  },
+  "ME": {
+    "address": "Montenegro",
+    "geoLat": 42.7904432662241,
+    "geoLng": 19.2507340776716
+  },
+  "MS": {
+    "address": "Montserrat",
+    "geoLat": 16.7417043,
+    "geoLng": -62.1916845999998
+  },
+  "MA": {
+    "address": "Morocco",
+    "geoLat": 32.3507513130338,
+    "geoLng": -6.01707272732872
+  },
+  "MZ": {
+    "address": "Mozambique",
+    "geoLat": -18.0874664869235,
+    "geoLng": 34.7501973908725
+  },
+  "NA": {
+    "address": "Namibia",
+    "geoLat": -21.2010102346557,
+    "geoLng": 17.2887615554773
+  },
+  "NR": {
+    "address": "Nauru",
+    "geoLat": -0.522103115219411,
+    "geoLng": 166.929376519841
+  },
+  "NP": {
+    "address": "Nepal",
+    "geoLat": 28.2530072798101,
+    "geoLng": 83.9385480132428
+  },
+  "NL": {
+    "address": "Netherlands",
+    "geoLat": 51.9724664894952,
+    "geoLng": 5.61349061168593
+  },
+  "NC": {
+    "address": "New Caledonia",
+    "geoLat": -21.3163377992766,
+    "geoLng": 165.715489207242
+  },
+  "NZ": {
+    "address": "New Zealand",
+    "geoLat": -41.8388752215127,
+    "geoLng": 171.779900195937
+  },
+  "NI": {
+    "address": "Nicaragua",
+    "geoLat": 12.3355420743792,
+    "geoLng": -84.9199411471587
+  },
+  "NE": {
+    "address": "Niger",
+    "geoLat": 9.59395988695573,
+    "geoLng": 8.10530640960786
+  },
+  "NG": {
+    "address": "Nigeria",
+    "geoLat": 9.59395988695573,
+    "geoLng": 8.10530640960786
+  },
+  "NU": {
+    "address": "Niue",
+    "geoLat": -19.0249700000001,
+    "geoLng": -169.8666861
+  },
+  "NF": {
+    "address": "Norfolk Island",
+    "geoLat": -29.03333,
+    "geoLng": 167.94972
+  },
+  "MP": {
+    "address": "Northern Mariana Islands",
+    "geoLat": 15.1884969,
+    "geoLng": 145.75323247
+  },
+  "NO": {
+    "address": "Norway",
+    "geoLat": 61.2483331493152,
+    "geoLng": 8.80482073895072
+  },
+  "OM": {
+    "address": "Oman",
+    "geoLat": 21.3836372099704,
+    "geoLng": 57.0864239443949
+  },
+  "PK": {
+    "address": "Pakistan",
+    "geoLat": 28.1863846711864,
+    "geoLng": 67.6952367278874
+  },
+  "PW": {
+    "address": "Palau",
+    "geoLat": 7.51507487829116,
+    "geoLng": 134.575242448648
+  },
+  "PS": {
+    "address": "Palestinian Territories",
+    "geoLat": 31.88333,
+    "geoLng": 35.2
+  },
+  "PA": {
+    "address": "Panama",
+    "geoLat": 8.70473482400532,
+    "geoLng": -80.2681751731831
+  },
+  "PG": {
+    "address": "Papua New Guinea",
+    "geoLat": -6.4783775316607,
+    "geoLng": 145.241749381464
+  },
+  "PY": {
+    "address": "Paraguay",
+    "geoLat": -23.236210654675,
+    "geoLng": -58.3910238917002
+  },
+  "PE": {
+    "address": "Peru",
+    "geoLat": -10.1510925136244,
+    "geoLng": -75.3111319559783
+  },
+  "PH": {
+    "address": "Philippines",
+    "geoLat": 14.58678841,
+    "geoLng": 120.98177916
+  },
+  "PN": {
+    "address": "Pitcairn Islands",
+    "geoLat": -25.06689772,
+    "geoLng": -130.10036259
+  },
+  "PL": {
+    "address": "Poland",
+    "geoLat": 52.1246099075455,
+    "geoLng": 19.30063630556
+  },
+  "PT": {
+    "address": "Portugal",
+    "geoLat": 39.6009946583093,
+    "geoLng": -8.56273059638958
+  },
+  "PR": {
+    "address": "Puerto Rico",
+    "geoLat": 18.2213294459009,
+    "geoLng": -66.4623392630918
+  },
+  "QA": {
+    "address": "Qatar",
+    "geoLat": 25.3150785008825,
+    "geoLng": 51.1912009969872
+  },
+  "RO": {
+    "address": "Romania",
+    "geoLat": 45.8436147575587,
+    "geoLng": 24.9692584752492
+  },
+  "RW": {
+    "address": "Rwanda",
+    "geoLat": -1.86550575827486,
+    "geoLng": 29.917651661429
+  },
+  "RE": {
+    "address": "Réunion",
+    "geoLat": -21.1216612099287,
+    "geoLng": 55.5381792270415
+  },
+  "WS": {
+    "address": "Samoa",
+    "geoLat": -13.83932976,
+    "geoLng": -171.76374956
+  },
+  "SM": {
+    "address": "San Marino",
+    "geoLat": 43.9429432390468,
+    "geoLng": 12.4609765471166
+  },
+  "SA": {
+    "address": "Saudi Arabia",
+    "geoLat": 23.384784,
+    "geoLng": 44.652426
+  },
+  "SN": {
+    "address": "Senegal",
+    "geoLat": 15.2214469730201,
+    "geoLng": -14.8208799701359
+  },
+  "RS": {
+    "address": "Serbia",
+    "geoLat": 44.2267366369366,
+    "geoLng": 20.7952998132557
+  },
+  "SC": {
+    "address": "Seychelles",
+    "geoLat": -4.62309306,
+    "geoLng": 55.45306535
+  },
+  "SG": {
+    "address": "Singapore",
+    "geoLat": 1.3516161224392,
+    "geoLng": 103.808052586332
+  },
+  "SX": {
+    "address": "Sint Maarten",
+    "geoLat": 18.0417616931319,
+    "geoLng": -63.0425714978791
+  },
+  "SK": {
+    "address": "Slovakia",
+    "geoLat": 48.7075308687827,
+    "geoLng": 19.4916510938648
+  },
+  "SI": {
+    "address": "Slovenia",
+    "geoLat": 46.1694584888026,
+    "geoLng": 14.6940763981247
+  },
+  "GS": {
+    "address": "So. Georgia & So. Sandwich Isl.",
+    "geoLat": 32.5658376002324,
+    "geoLng": 54.3013740876592
+  },
+  "SB": {
+    "address": "Solomon Islands",
+    "geoLat": -9.43058362,
+    "geoLng": 159.95268507
+  },
+  "SO": {
+    "address": "Somalia",
+    "geoLat": 5.78639625215069,
+    "geoLng": 47.3258529830799
+  },
+  "ZA": {
+    "address": "South Africa",
+    "geoLat": -28.3782721906973,
+    "geoLng": 23.9137106762068
+  },
+  "KR": {
+    "address": "South Korea",
+    "geoLat": 36.5362364654109,
+    "geoLng": 128.168944342317
+  },
+  "SS": {
+    "address": "South Sudan",
+    "geoLat": 7.2653860999999,
+    "geoLng": 30.0548899999997
+  },
+  "ES": {
+    "address": "Spain",
+    "geoLat": 41.2948556295683,
+    "geoLng": -4.05568501525488
+  },
+  "LK": {
+    "address": "Sri Lanka",
+    "geoLat": 7.60808521895433,
+    "geoLng": 80.7047272491285
+  },
+  "BL": {
+    "address": "St. Barthélemy",
+    "geoLat": 0.33677848,
+    "geoLng": 6.73028605
+  },
+  "SH": {
+    "address": "St. Helena",
+    "geoLat": -15.92459139,
+    "geoLng": -5.71833264
+  },
+  "KN": {
+    "address": "St. Kitts & Nevis",
+    "geoLat": 17.3261893181251,
+    "geoLng": -62.7535176302248
+  },
+  "LC": {
+    "address": "St. Lucia",
+    "geoLat": 13.897869297883,
+    "geoLng": -60.9687124495575
+  },
+  "MF": {
+    "address": "St. Martin",
+    "geoLat": 18.0886466717115,
+    "geoLng": -63.0507908400355
+  },
+  "PM": {
+    "address": "St. Pierre & Miquelon",
+    "geoLat": 46.8964295999999,
+    "geoLng": -56.3222402999999
+  },
+  "VC": {
+    "address": "St. Vincent & Grenadines",
+    "geoLat": 0.33677848,
+    "geoLng": 6.73028605
+  },
+  "SR": {
+    "address": "Suriname",
+    "geoLat": 3.69296650830846,
+    "geoLng": -55.9118262275729
+  },
+  "SJ": {
+    "address": "Svalbard & Jan Mayen",
+    "geoLat": 78.715404,
+    "geoLng": 20.294606
+  },
+  "SZ": {
+    "address": "Swaziland",
+    "geoLat": -26.5626420959616,
+    "geoLng": 31.4975289562193
+  },
+  "SE": {
+    "address": "Sweden",
+    "geoLat": 64.9648751621697,
+    "geoLng": 17.6754094331351
+  },
+  "CH": {
+    "address": "Switzerland",
+    "geoLat": 46.8024955829499,
+    "geoLng": 8.23439191387853
+  },
+  "ST": {
+    "address": "São Tomé & Príncipe",
+    "geoLat": 0.33677848,
+    "geoLng": 6.73028605
+  },
+  "TW": {
+    "address": "Taiwan",
+    "geoLat": 23.7779779950014,
+    "geoLng": 120.930229378541
+  },
+  "TJ": {
+    "address": "Tajikistan",
+    "geoLat": 38.8385084835418,
+    "geoLng": 71.0420037711059
+  },
+  "TZ": {
+    "address": "Tanzania",
+    "geoLat": -6.27035338020445,
+    "geoLng": 34.8234540265851
+  },
+  "TH": {
+    "address": "Thailand",
+    "geoLat": 15.127333464868,
+    "geoLng": 101.017437716385
+  },
+  "TL": {
+    "address": "TimorLeste",
+    "geoLat": -8.556856,
+    "geoLng": 125.56031
+  },
+  "TG": {
+    "address": "Togo",
+    "geoLat": 8.76622092166324,
+    "geoLng": 1.04255291389074
+  },
+  "TK": {
+    "address": "Tokelau",
+    "geoLat": -9.19897526,
+    "geoLng": -171.84954066
+  },
+  "TO": {
+    "address": "Tonga",
+    "geoLat": -21.13637335,
+    "geoLng": -175.20610125
+  },
+  "TT": {
+    "address": "Trinidad & Tobago",
+    "geoLat": 10.4686430117018,
+    "geoLng": -61.2531757283896
+  },
+  "TA": {
+    "address": "Tristan da Cunha",
+    "geoLat": -37.116666666667,
+    "geoLng": -12.28305555555
+  },
+  "TN": {
+    "address": "Tunisia",
+    "geoLat": 34.1107038598115,
+    "geoLng": 9.56116835557131
+  },
+  "TR": {
+    "address": "Turkey",
+    "geoLat": 39.0604813685019,
+    "geoLng": 35.1795933806353
+  },
+  "TM": {
+    "address": "Turkmenistan",
+    "geoLat": 39.1222850315681,
+    "geoLng": 59.3843773120436
+  },
+  "TC": {
+    "address": "Turks & Caicos Islands",
+    "geoLat": 21.7214683,
+    "geoLng": -71.6201782999998
+  },
+  "TV": {
+    "address": "Tuvalu",
+    "geoLat": -8.52427147,
+    "geoLng": 179.1952237
+  },
+  "UM": {
+    "address": "U.S. Outlying Islands",
+    "geoLat": 19.305073,
+    "geoLng": 166.636881
+  },
+  "VI": {
+    "address": "U.S. Virgin Islands",
+    "geoLat": 17.7355381596591,
+    "geoLng": -64.7625859114436
+  },
+  "UG": {
+    "address": "Uganda",
+    "geoLat": 1.27996353132461,
+    "geoLng": 32.3862178703861
+  },
+  "AE": {
+    "address": "United Arab Emirates",
+    "geoLat": 23.8520599823879,
+    "geoLng": 54.2561723713588
+  },
+  "GB": {
+    "address": "United Kingdom",
+    "geoLat": 54.2379333607472,
+    "geoLng": -2.36966957036279
+  },
+  "US": {
+    "address": "United States",
+    "geoLat": 39.3812661305678,
+    "geoLng": -97.9222112121185
+  },
+  "UY": {
+    "address": "Uruguay",
+    "geoLat": -32.7996455126793,
+    "geoLng": -56.012396238658
+  },
+  "UZ": {
+    "address": "Uzbekistan",
+    "geoLat": 41.7504367984144,
+    "geoLng": 63.169371992914
+  },
+  "VU": {
+    "address": "Vanuatu",
+    "geoLat": -17.74296727,
+    "geoLng": 168.31741541
+  },
+  "VA": {
+    "address": "Vatican City",
+    "geoLat": 41.904,
+    "geoLng": 12.453
+  },
+  "VE": {
+    "address": "Venezuela",
+    "geoLat": 7.61957014788959,
+    "geoLng": -65.801997444749
+  },
+  "VN": {
+    "address": "Vietnam",
+    "geoLat": 14.3154241771087,
+    "geoLng": 108.339537475899
+  },
+  "WF": {
+    "address": "Wallis & Futuna",
+    "geoLat": -13.28078435,
+    "geoLng": -176.18564416
+  },
+  "EH": {
+    "address": "Western Sahara",
+    "geoLat": 24.6008820899188,
+    "geoLng": -13.7046095218304
+  },
+  "YE": {
+    "address": "Yemen",
+    "geoLat": 15.9378350127516,
+    "geoLng": 47.6219307491681
+  },
+  "ZM": {
+    "address": "Zambia",
+    "geoLat": -14.0049082837326,
+    "geoLng": 27.4306751716734
+  },
+  "AX": {
+    "address": "Åland Islands",
+    "geoLat": 60.11443267,
+    "geoLng": 19.93993403
+  }
+}

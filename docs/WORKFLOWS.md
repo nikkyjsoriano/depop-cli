@@ -19,6 +19,7 @@ own path/method isn't called; its **steps** are.
     x-mastro-args:              # workflow flags (no OpenAPI parameters of its own)
       - { name: photo, required: true, multiple: true }
       - { name: department, enum: [menswear, womenswear, ...] }
+      - { name: size, requires: [department, type] }  # flags that only work together
       - { name: variant-set,   # a DERIVED flag, looked up from other args
           x-mastro-resolve:
             from: "file:reference/categories.json"
@@ -64,7 +65,44 @@ Each step calls an operation (`operationId`) and stores its result under
   even when `output` extracts only part of it.
 - **`request`** — per-step overrides: `url`, `method`, `body`, `headers`,
   `no_auth` (skip auth, for presigned URLs), `transport` (`direct` | `browser`),
-  `form` (replay a server-rendered form as the body — see below).
+  `require_body` (see below), `form` (replay a server-rendered form as the body
+  — see below).
+- **`request.require_body: true`** — fail the step instead of sending an empty
+  body. In a partial update every field is optional, so a command with no field
+  flags renders `{}`; without this it would write an empty object at the remote
+  resource and report success. With `base` (below) the test is whether the user
+  changed anything, since a replacing write always carries the whole resource.
+  Enforced under `--dry-run` too.
+- **`request.base`** — an object template the rendered `body` is merged over,
+  top-level key by key. For an endpoint that **replaces** a resource rather than
+  patching it, the base is the resource as it stands (read by an earlier step)
+  and the body is only what the user is changing; fields they didn't pass drop
+  out of the body (see `${?...}`) and the base's value survives. This is how
+  Depop's `update` drives a full-replace PUT from a partial command without
+  clearing the fields it doesn't mention:
+
+  ```yaml
+  - id: current                      # read the resource
+    operationId: getListingForEdit
+  - id: write
+    operationId: updateListing
+    request:
+      base: { price_amount: "${steps.current.pricing.original_price.total_price}", ... }
+      body: { price_amount: "${?args.price}" }      # only the change
+  ```
+- **`file` step** — load a JSON file bundled in the provider directory as the
+  step's result, with no HTTP call. Use for reference data a later step has to
+  index by something only known at run time, which an `x-mastro-resolve` arg
+  can't do because those resolve before the flow runs:
+
+  ```yaml
+  - id: countryGeo
+    file: "reference/country_geo.json"
+  # later: "${steps.countryGeo.${steps.current.country}.address}"
+  ```
+
+  Under `--dry-run` the file is still read (so a missing or broken one fails at
+  plan time) but the step's result is a placeholder, like every other step.
 - **`request.form: { html, selector, set, unset }`** — build an
   `application/x-www-form-urlencoded` body by replaying an HTML `<form>` from a
   prior step's response. `html` is a template (usually `"${steps.<id>}"`),
@@ -95,12 +133,29 @@ Each step calls an operation (`operationId`) and stores its result under
 The workflow's `result:` names the step whose response the command returns (or a
 dotted path into it, e.g. `createListing.slug`).
 
+## Flags that only work together
+
+An `x-mastro-args` entry can declare `requires: [<other flags>]`. Some values
+only reach the wire through others: a Depop `--size` becomes a variant id derived
+from `--department` and `--type`, and a `--address-id` rides inside the shipping
+block that `--parcel-size` builds. On its own, such a flag would be dropped
+during templating and the command would still report success. `requires` turns
+that into a usage error before anything is sent.
+
 ## Templates available in a workflow
 
 - `${args.<flag>}` — a CLI flag value (`${args.brand}`)
 - `${args.<flag>|<default>}` — with a literal fallback (`${args.currency|USD}`).
   The fallbacks `[]` and `{}` yield a real empty array / object, not the strings
   `"[]"` / `"{}"` — so an omitted repeatable flag becomes `[]` in the body.
+- `${?args.<flag>}` — **optional**: a flag that wasn't passed (or resolved empty)
+  yields nothing and the body entry holding it is dropped. This is how a partial
+  update is expressed as data: the fields the user didn't pass never reach the
+  wire, so the remote object keeps them.
+- `${args.<flag>:+<literal>}` — **guard**: renders the literal when the flag is
+  set, `""` otherwise. Used on a key, so a group that only makes sense whole (a
+  shipping block, a variants map) is sent whole or not at all:
+  `"${args.parcel-size:+shipping_methods}"`.
 - `${steps.<id>...}` — a prior step's result
 - `${item}` / `${<as>}` / `${index}` — the current foreach element / its index
 - `${uuid}` / `${now}` — generated per use
@@ -114,7 +169,9 @@ A whole-placeholder string (`"${steps.slots}"`) preserves the resolved value's
 type (array/object/number); a mixed string interpolates to text. In a body
 object, **keys are templated too** — `{ "${args.variant}": 1 }` → `{ "4": 1 }`,
 and an entry whose key resolves empty is dropped (so a one-size item with no
-variant yields `{}`).
+variant yields `{}`). A dropped key short-circuits its value: the body of an
+entry that isn't being sent is never rendered, so a guarded group can reference
+flags that only exist when its guard passed.
 
 ## Deriving values from bundled data
 

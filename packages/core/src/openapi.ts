@@ -150,6 +150,14 @@ export interface WorkflowStep {
   as?: string;
   /** A transform step's input expression (templated). Defaults to `${item}`. */
   value?: string;
+  /**
+   * Load a JSON file bundled in the provider directory as this step's result
+   * (e.g. "reference/country_geo.json"). No HTTP call. Use for reference data a
+   * later step has to index by a value it only learns at run time, which an
+   * `x-mastro-resolve` arg cannot do because those resolve before the flow runs:
+   * `${steps.countryGeo.${steps.current.country}.address}`.
+   */
+  file?: string;
   /** Per-step request shaping (templated). */
   request?: WorkflowRequest;
   /** Poll config — repeat the request until `until` resolves truthy. */
@@ -166,6 +174,15 @@ export interface WorkflowRequest {
   /** Body (object template, deep-resolved) or a raw template string. */
   body?: unknown;
   /**
+   * Object template the rendered `body` is merged over, top-level key by key.
+   * For an endpoint that REPLACES the resource rather than patching it (Depop's
+   * listing PUT), the base is the resource as it is now, read by an earlier
+   * step, and the body carries only the fields the user is changing. Fields the
+   * user didn't pass drop out of the body (see `${?...}`) and the base's value
+   * survives, so an edit cannot silently blank the rest of the object.
+   */
+  base?: unknown;
+  /**
    * Build the body by replaying an HTML <form> from a prior step's response —
    * for state changes gated behind a server-rendered form with a one-time CSRF
    * token and many hidden fields (e.g. Amazon's Buy Now → place-order). The
@@ -177,6 +194,14 @@ export interface WorkflowRequest {
   headers?: Record<string, string>;
   /** Skip x-mastro-auth for this request (e.g. presigned S3 PUT). */
   no_auth?: boolean;
+  /**
+   * Refuse to send this request when its rendered body is empty. For a partial
+   * update every field is optional, so a command with no field flags (or with
+   * flags that all resolve to nothing) would otherwise fire a `{}` write at the
+   * remote object and report success. Fails the step with a usage-style message
+   * instead, under --dry-run too.
+   */
+  require_body?: boolean;
   /** Force a transport: "direct" (plain fetch) or "browser" (extension proxy). */
   transport?: "direct" | "browser";
 }
@@ -231,6 +256,14 @@ export interface WorkflowArg {
   enum?: string[];
   /** A boolean flag (no value). */
   boolean?: boolean;
+  /**
+   * Other flags this one can't be used without. Passing `--size` on a Depop
+   * update is meaningless without `--department`/`--type`, because the size only
+   * reaches the wire through a variant id derived from all three: without them
+   * the edit would silently do nothing. Declaring the dependency turns that into
+   * a usage error instead.
+   */
+  requires?: string[];
   /** Resolve valid values from another operation (same as a parameter's). */
   "x-mastro-resolve"?: MastroResolve;
 }
