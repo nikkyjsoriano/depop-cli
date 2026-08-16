@@ -2,7 +2,7 @@
 import { expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 
-import type { MastroResolve } from "@mastro/core";
+import type { DepopResolve } from "@depop/core";
 import { extractPath, JsonCache, Resolver } from "../src/index.ts";
 
 test("extractPath walks nested-object roots with [] wildcards", () => {
@@ -21,7 +21,7 @@ test("extractPath walks bare-array roots and deep wildcards", () => {
 });
 
 test("Resolver maps label→wire, passes wire ids through, caches the fetch", async () => {
-  const root = `/tmp/mastro-resolver-test-${process.pid}`;
+  const root = `/tmp/depop-resolver-test-${process.pid}`;
   rmSync(root, { recursive: true, force: true });
 
   let fetches = 0;
@@ -29,8 +29,8 @@ test("Resolver maps label→wire, passes wire ids through, caches the fetch", as
     fetches++;
     return [{ children: [{ children: [{ composite_id: "54.4", name: "M" }] }] }];
   };
-  const resolver = new Resolver(new JsonCache("test", root), fetcher);
-  const spec: MastroResolve = {
+  const resolver = new Resolver(new JsonCache(root), fetcher);
+  const spec: DepopResolve = {
     from: "sizeFilters",
     value_path: "[].children[].children[].composite_id",
     label_path: "[].children[].children[].name",

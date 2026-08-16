@@ -1,5 +1,5 @@
 /**
- * Taxonomy resolver — turns a parameter's `x-mastro-resolve` into a
+ * Taxonomy resolver — turns a parameter's `x-depop-resolve` into a
  * label↔wire-value index by fetching the referenced metadata operation.
  *
  * Depop's `sizes`/`brands`/`categories` aren't a static enum; their valid
@@ -8,7 +8,7 @@
  * value_path / label_path, and lets the connector map whatever the user passes
  * (a wire id OR a human label) to the wire value the API expects.
  */
-import type { MastroResolve } from "@mastro/core";
+import type { DepopResolve } from "@depop/core";
 
 import { JsonCache } from "./cache.ts";
 
@@ -36,7 +36,7 @@ export class Resolver {
   ) {}
 
   /** Build (or load cached) the taxonomy entries for an endpoint-backed resolve. */
-  async load(spec: MastroResolve): Promise<TaxonomyEntry[]> {
+  async load(spec: DepopResolve): Promise<TaxonomyEntry[]> {
     const cacheKey = `resolve.${spec.from}`;
     const cached = this.cache.get<TaxonomyEntry[]>(cacheKey);
     if (cached) return cached;
@@ -57,7 +57,7 @@ export class Resolver {
    * returns the entry's `value_path` field — used for two-level taxonomies like
    * `(department/product_type) → size_set`.
    */
-  async resolveValue(spec: MastroResolve, input: string): Promise<string> {
+  async resolveValue(spec: DepopResolve, input: string): Promise<string> {
     if (spec.from.startsWith(FILE_PREFIX)) return this.resolveFromFile(spec, input);
 
     const entries = await this.load(spec);
@@ -68,7 +68,7 @@ export class Resolver {
    * Keyed file lookup with an explicit key (computed by the caller from
    * `key_template`). Returns the entry's `value_path` field, or "" if absent.
    */
-  lookupKeyed(spec: MastroResolve, key: string): string {
+  lookupKeyed(spec: DepopResolve, key: string): string {
     if (!this.fileLoader) throw new Error(`no file loader configured for "${spec.from}"`);
     const data = this.fileLoader(spec.from.slice(FILE_PREFIX.length));
     const entry = data && typeof data === "object" ? (data as Record<string, unknown>)[key] : undefined;
@@ -77,7 +77,7 @@ export class Resolver {
     return value == null ? "" : String(value);
   }
 
-  private resolveFromFile(spec: MastroResolve, input: string): string {
+  private resolveFromFile(spec: DepopResolve, input: string): string {
     if (!this.fileLoader) throw new Error(`no file loader configured for "${spec.from}"`);
     const data = this.fileLoader(spec.from.slice(FILE_PREFIX.length));
 
@@ -85,7 +85,7 @@ export class Resolver {
     return matchEntry(this.toEntries(data, spec), input);
   }
 
-  private toEntries(body: unknown, spec: MastroResolve): TaxonomyEntry[] {
+  private toEntries(body: unknown, spec: DepopResolve): TaxonomyEntry[] {
     const values = spec.value_path ? extractPath(body, spec.value_path) : [];
     const labels = spec.label_path ? extractPath(body, spec.label_path) : [];
     return values.map((value, i) => ({ value: String(value), label: String(labels[i] ?? value) }));

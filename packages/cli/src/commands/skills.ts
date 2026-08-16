@@ -1,9 +1,9 @@
 /**
- * `mastro skills` — distribute provider playbooks into agent skills folders.
+ * `depop skills` — install the bundled agent playbooks as agent skills.
  *
- *   mastro skills list [provider]            what's available
- *   mastro skills add <provider>[/<skill>]   install (plus the root mastro skill)
- *   mastro skills update                     refresh everything installed here
+ *   depop skills list              what's available
+ *   depop skills add [<skill>…]    install (all of them by default)
+ *   depop skills update            refresh everything installed here
  *
  * Install target: ./.claude/skills (project) by default; --global for
  * ~/.claude/skills; --dir <path> for anything else (e.g. .agents/skills).
@@ -11,28 +11,31 @@
 import { join } from "node:path";
 
 import { UsageError } from "../args.ts";
-import { packageRoot, type CliContext } from "../context.ts";
+import { packageRoot } from "../context.ts";
 import { emit, pc, ui } from "../output.ts";
 import {
+  bundledSkills,
   installSkill,
   installTarget,
   installedSkills,
-  providerSkills,
-  readSkill,
   type SkillInfo,
 } from "../skill-files.ts";
 
-const ROOT_SKILL = "mastro";
+/**
+ * The session-model skill (login, `status --json`, exit codes) that every other
+ * playbook builds on — so it rides along with every install.
+ */
+const ROOT_SKILL = "depop";
 
-export function skills(ctx: CliContext, rest: string[], asJson: boolean): number {
+export function skills(rest: string[], asJson: boolean): number {
   const [sub, ...args] = rest;
   switch (sub) {
     case "list":
-      return list(ctx, args[0], asJson);
+      return list(asJson);
     case "add":
-      return add(ctx, args, asJson);
+      return add(args, asJson);
     case "update":
-      return update(ctx, args, asJson);
+      return update(args, asJson);
     case undefined:
     case "--help":
     case "-h":
@@ -43,41 +46,22 @@ export function skills(ctx: CliContext, rest: string[], asJson: boolean): number
   }
 }
 
-/** The general mastro skill, shipped at the package root next to providers/. */
-function rootSkill(): SkillInfo {
-  return readSkill(join(packageRoot(), "skills", ROOT_SKILL), ROOT_SKILL);
+function available(): SkillInfo[] {
+  return bundledSkills(join(packageRoot(), "skills"));
 }
 
-/** Resolve "<provider>" or "<provider>/<skill>" specs into skills to install. */
-function resolveSpec(ctx: CliContext, spec: string): SkillInfo[] {
-  if (spec === ROOT_SKILL) return [rootSkill()];
-
-  const [providerId, skillName, extra] = spec.split("/");
-  if (!providerId || extra !== undefined) {
-    throw new UsageError(`bad skill spec "${spec}" — use <provider> or <provider>/<skill>`);
-  }
-  const provider = ctx.registry.load(providerId);
-  const available = providerSkills(provider.id, provider.dir);
-  if (available.length === 0) {
-    throw new UsageError(`provider "${providerId}" ships no skills`);
-  }
-  if (skillName === undefined) return available;
-
-  const found = available.find((s) => s.source === `${providerId}/${skillName}`);
+/** Resolve a skill name to the bundled skill, with the available names on a miss. */
+function resolveSpec(spec: string): SkillInfo {
+  const all = available();
+  const found = all.find((s) => s.source === spec);
   if (!found) {
-    const names = available.map((s) => s.source).join(", ");
-    throw new UsageError(`no skill "${spec}". Available: ${names}`);
+    throw new UsageError(`no skill "${spec}". Available: ${all.map((s) => s.source).join(", ")}`);
   }
-  return [found];
+  return found;
 }
 
-function list(ctx: CliContext, providerId: string | undefined, asJson: boolean): number {
-  const providerIds = providerId ? [providerId] : ctx.registry.list();
-  const rows: SkillInfo[] = [rootSkill()];
-  for (const id of providerIds) {
-    const provider = ctx.registry.load(id);
-    rows.push(...providerSkills(provider.id, provider.dir));
-  }
+function list(asJson: boolean): number {
+  const rows = available();
 
   if (asJson) {
     emit(rows.map(({ source, name, description }) => ({ source, name, description })), true);
@@ -86,25 +70,28 @@ function list(ctx: CliContext, providerId: string | undefined, asJson: boolean):
 
   ui.heading("Available skills");
   for (const s of rows) {
-    ui.print(`  ${pc.bold(s.source.padEnd(18))} ${pc.dim(truncate(s.description, 80))}`);
+    ui.print(`  ${pc.bold(s.source.padEnd(12))} ${pc.dim(truncate(s.description, 80))}`);
   }
-  ui.info("\nInstall: mastro skills add <provider>[/<skill>]  [--global | --dir <path>]");
+  ui.info("\nInstall: depop skills add [<skill>…]  [--global | --dir <path>]");
   return 0;
 }
 
-function add(ctx: CliContext, args: string[], asJson: boolean): number {
+function add(args: string[], asJson: boolean): number {
   const { specs, flags } = splitFlags(args);
-  if (specs.length === 0) {
-    throw new UsageError("what to add? e.g. `mastro skills add depop` or `mastro skills add depop/search`");
-  }
   const target = installTarget(flags);
 
-  // Dedup by name: the root mastro skill rides along with every install so
-  // the agent always has the session-model context.
+  // No names = install everything. Otherwise the named skills, deduped, always
+  // with the root skill so the agent has the session-model context.
   const toInstall = new Map<string, SkillInfo>();
-  toInstall.set(ROOT_SKILL, rootSkill());
-  for (const spec of specs) {
-    for (const skill of resolveSpec(ctx, spec)) toInstall.set(skill.name, skill);
+  if (specs.length === 0) {
+    for (const skill of available()) toInstall.set(skill.name, skill);
+  } else {
+    const root = resolveSpec(ROOT_SKILL);
+    toInstall.set(root.name, root);
+    for (const spec of specs) {
+      const skill = resolveSpec(spec);
+      toInstall.set(skill.name, skill);
+    }
   }
 
   const installed = [...toInstall.values()].map((skill) => ({
@@ -122,16 +109,20 @@ function add(ctx: CliContext, args: string[], asJson: boolean): number {
   return 0;
 }
 
-function update(ctx: CliContext, args: string[], asJson: boolean): number {
+function update(args: string[], asJson: boolean): number {
   const { specs, flags } = splitFlags(args);
-  if (specs.length > 0) throw new UsageError("skills update takes no positionals — it refreshes everything installed in the target");
+  if (specs.length > 0) {
+    throw new UsageError(
+      "skills update takes no positionals — it refreshes everything installed in the target",
+    );
+  }
   const target = installTarget(flags);
 
   const results: Array<{ source: string; name: string; status: "updated" | "missing-source" }> = [];
   for (const { provenance } of installedSkills(target)) {
     let skill: SkillInfo | undefined;
     try {
-      [skill] = resolveSpec(ctx, provenance.source);
+      skill = resolveSpec(provenance.source);
     } catch {
       skill = undefined;
     }
@@ -148,12 +139,12 @@ function update(ctx: CliContext, args: string[], asJson: boolean): number {
     return 0;
   }
   if (results.length === 0) {
-    ui.info(`No mastro-managed skills found in ${target}.`);
+    ui.info(`No depop-managed skills found in ${target}.`);
     return 0;
   }
   for (const r of results) {
     if (r.status === "updated") ui.success(`${r.name} refreshed`);
-    else ui.warn(`${r.source}: source no longer available (provider removed?) — left as-is`);
+    else ui.warn(`${r.source}: no longer shipped — left as-is`);
   }
   return 0;
 }
@@ -187,12 +178,12 @@ function truncate(text: string, max: number): string {
 }
 
 function printHelp(): void {
-  ui.print(`mastro skills — install agent skills for connectors.
+  ui.print(`depop skills — install the agent playbooks for this CLI.
 
 Usage:
-  mastro skills list [provider]              List available skills
-  mastro skills add <provider>[/<skill>]...  Install skills (+ the root mastro skill)
-  mastro skills update                       Refresh installed skills in the target
+  depop skills list              List available skills
+  depop skills add [<skill>…]    Install skills (all of them if none named)
+  depop skills update            Refresh installed skills in the target
 
 Target (for add/update):
   (default)        ./.claude/skills          project-level
@@ -200,7 +191,7 @@ Target (for add/update):
   --dir <path>     anywhere (e.g. .agents/skills)
 
 Examples:
-  mastro skills add depop
-  mastro skills add amazon/search amazon/detail --global
-  mastro skills update`);
+  depop skills add
+  depop skills add search --global
+  depop skills update`);
 }

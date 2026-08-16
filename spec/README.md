@@ -1,17 +1,19 @@
-# Depop connector
+# The Depop connector
 
-Drives Depop's web API using your logged-in browser session.
+Drives Depop's web API using your logged-in browser session. This directory *is*
+the connector: `openapi.yaml` + `auth.manifest.json` + `reference/`.
 
 ```bash
-mastro login depop
-mastro depop search "holiday knit jumper men" --sizes M
-mastro depop search "carhartt jacket" --conditions used_good --colours green --sortBy priceAscending
-mastro depop search "vintage tee" --brandIds nike --priceMax 50 --isDiscounted --json
-mastro depop me
+depop login
+depop search "holiday knit jumper men" --sizes M
+depop search "carhartt jacket" --conditions used_good --colours green --sortBy priceAscending
+depop search "vintage tee" --brandIds nike --priceMax 50 --isDiscounted --json
+depop me
 ```
 
-The connector is described by [`openapi.yaml`](openapi.yaml) (a valid OpenAPI 3.1
-document) plus [`auth.manifest.json`](auth.manifest.json) for the browser capture.
+The API surface is [`openapi.yaml`](openapi.yaml) (a valid OpenAPI 3.1 document);
+the browser capture is [`auth.manifest.json`](auth.manifest.json). Authoring
+reference: [`docs/SPEC.md`](../docs/SPEC.md).
 
 ## How auth works
 
@@ -22,8 +24,8 @@ Depop's web app stores auth in two cookies on `depop.com`:
 | `access_token` | Bearer token for the web API         |
 | `user_id`      | Your numeric account id (`x-user-id`)|
 
-`access_token` is **HttpOnly**, so page JavaScript can't read it — the mastro
-extension reads it via `chrome.cookies`. `mastro login depop` opens Depop, waits
+`access_token` is **HttpOnly**, so page JavaScript can't read it — the depop
+extension reads it via `chrome.cookies`. `depop login` opens Depop, waits
 until both cookies exist, and stores them (token redacted in logs).
 
 Each request also sends client-generated `depop-device-id` / `depop-session-id`
@@ -34,17 +36,17 @@ Each request also sends client-generated `depop-device-id` / `depop-session-id`
 The web API sits behind a Cloudflare **managed challenge** (the "Just a moment"
 JS interstitial). TLS impersonation alone can't solve it — even a perfect Chrome
 handshake with the captured cookies gets a `403`. So Depop sets
-`x-mastro-replay.via_browser: true`, and mastro runs the request **inside your
+`x-depop-replay.via_browser: true`, and the CLI runs the request **inside your
 logged-in browser tab** (which already cleared the challenge) via the extension.
-See [`docs/BROWSER-PROXY.md`](../../docs/BROWSER-PROXY.md).
+See [`docs/BROWSER-PROXY.md`](../docs/BROWSER-PROXY.md).
 
-**Requirement:** the mastro extension must be installed/enabled and you must have
-a logged-in **depop.com tab open** (mastro will open one if needed). No
+**Requirement:** the depop extension must be installed/enabled and you must have
+a logged-in **depop.com tab open** (the CLI will open one if needed). No
 `curl-impersonate` needed.
 
 ```
-mastro depop search ...
-  → mastro proxy server (127.0.0.1:7878)
+depop search ...
+  → the CLI's proxy server (127.0.0.1:7878)
   → extension runs fetch() in your depop.com tab (past Cloudflare)
   → JSON back to the CLI
 ```
@@ -75,7 +77,7 @@ mastro depop search ...
 ### Listing an item
 
 ```bash
-mastro depop list \
+depop list \
   --photo front.jpg --photo back.jpg \
   --brand polo-ralph-lauren \
   --department menswear --type tshirts --size M \
@@ -88,7 +90,7 @@ mastro depop list \
 ```
 
 - **Photos must be square JPEGs** (the `depop-list-item` skill handles
-  HEIC→JPEG + cropping; mastro uploads them as-is).
+  HEIC→JPEG + cropping; depop uploads them as-is).
 - `variant_set`, `gender`, and the size **`variant`** are **derived** from
   `--department`/`--type`/`--size` via bundled reference data
   (`reference/categories.json`, `reference/department_gender.json`,
@@ -97,7 +99,7 @@ mastro depop list \
   `(size_set/size)→variant` member id, which becomes the `variants` map on the
   listing so the size attaches correctly.
 - **`--dry-run` builds and prints every request body without uploading or
-  posting** — always dry-run first. See [`docs/WORKFLOWS.md`](../../docs/WORKFLOWS.md).
+  posting** — always dry-run first. See [`docs/WORKFLOWS.md`](../docs/WORKFLOWS.md).
 - **Boost is never enabled.** The create body pins `boost` to `inactive` and
   there is no flag for it; making boost a real choice is separate work.
 - Depop's payload has no title field. The listing text is `description`, and its
@@ -109,10 +111,10 @@ Edits everything except photos. Only the flags you pass change; everything else
 is carried over from the listing as it is now.
 
 ```bash
-mastro depop update seller-asics-gel-1130-543c --price 110 --dry-run
-mastro depop update seller-asics-gel-1130-543c --description "ASICS GEL-1130 #asics #sneakers"
-mastro depop update seller-asics-gel-1130-543c --department womenswear --type trainers --size 6
-mastro depop update seller-asics-gel-1130-543c --address-id 26518315
+depop update seller-asics-gel-1130-543c --price 110 --dry-run
+depop update seller-asics-gel-1130-543c --description "ASICS GEL-1130 #asics #sneakers"
+depop update seller-asics-gel-1130-543c --department womenswear --type trainers --size 6
+depop update seller-asics-gel-1130-543c --address-id 26518315
 ```
 
 **Takes the listing slug, not the id.** The slug is the last path segment of the
@@ -171,7 +173,7 @@ matching it is matching reality. Pass `--address --lat --lng` to override.
 - **An update with no field flags is refused.** Replacing the listing with
   itself is not a harmless no-op.
 - **Never sent:** `boost` (an edit payload has no boost field at all; boosting
-  is a separate endpoint mastro never calls) and the create-time
+  is a separate endpoint depop never calls) and the create-time
   `listing_lifecycle_id` / `persistent_id`.
 - Depop's payload has no title field. The listing text is `description`, and its
   first line is what reads as the title, so retitling is a `--description` edit.
@@ -225,8 +227,8 @@ Every filter from the website's filter bar is a flag, generated from the spec:
 
 The `sizes` / `brandIds` / `categories` value lists are **fetched from Depop's
 own filter-metadata endpoints** (`sizeFilters`, `brandsById`, `categoryFilters`,
-declared `x-mastro-hidden` in the spec) and cached under
-`~/.mastro/cache/depop/`, so `--sizes M` resolves to the wire id `54.4`
+declared `x-depop-hidden` in the spec) and cached under
+`~/.depop/cache/depop/`, so `--sizes M` resolves to the wire id `54.4`
 automatically.
 
 ## Status & drift
@@ -235,7 +237,7 @@ automatically.
 notice. If `search` starts returning Cloudflare HTML or a shape without an
 `objects` array:
 
-1. `mastro login depop` (most failures are an expired session → `401`/`419`).
+1. `depop login` (most failures are an expired session → `401`/`419`).
 2. Capture a fresh HAR from depop.com's Network tab and diff the
    `search/products` request against `openapi.yaml`.
 

@@ -1,7 +1,7 @@
 /**
  * Browser-proxy runtime for the extension.
  *
- * Continuously long-polls the mastro proxy server (fixed loopback port). When a
+ * Continuously long-polls the depop proxy server (fixed loopback port). When a
  * request arrives, it runs the fetch INSIDE an authenticated tab on the target
  * origin — in the page's MAIN world — so the request carries that tab's solved
  * Cloudflare challenge + same-origin cookies. The service worker's own fetch
@@ -10,7 +10,7 @@
  * See docs/BROWSER-PROXY.md.
  */
 
-const PROXY_PORT = 7878; // must match @mastro/core DEFAULT_PROXY_PORT
+const PROXY_PORT = 7878; // must match @depop/core DEFAULT_PROXY_PORT
 const POLL_BASE = `http://127.0.0.1:${PROXY_PORT}`;
 
 let running = false;
@@ -35,7 +35,7 @@ async function loop() {
       }
       request = /** @type {ProxyRequest} */ (await res.json());
     } catch {
-      // Server not up (no mastro command running) — back off and retry.
+      // Server not up (no depop command running) — back off and retry.
       await sleep(3000);
       continue;
     }
@@ -52,7 +52,7 @@ async function handleRequest(request) {
     response = await runFetchInTab(tabId, request);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    response = { status: 0, headers: {}, bodyText: JSON.stringify({ mastroProxyError: message }) };
+    response = { status: 0, headers: {}, bodyText: JSON.stringify({ depopProxyError: message }) };
   }
   try {
     await fetch(`${POLL_BASE}/proxy/response/${request.id}`, {

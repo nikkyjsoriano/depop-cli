@@ -4,12 +4,12 @@
  *
  * @param {string} url
  * @param {string[]} includeNamesMatching   regex sources
- * @returns {Promise<Record<string, MastroCookie>>}
+ * @returns {Promise<Record<string, DepopCookie>>}
  */
 export async function extractCookies(url, includeNamesMatching) {
   const patterns = (includeNamesMatching || []).map((p) => new RegExp(p));
   const all = await chrome.cookies.getAll({ url });
-  /** @type {Record<string, MastroCookie>} */
+  /** @type {Record<string, DepopCookie>} */
   const out = {};
   for (const c of all) {
     if (patterns.length === 0 || patterns.some((re) => re.test(c.name))) {

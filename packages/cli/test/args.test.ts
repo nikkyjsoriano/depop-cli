@@ -7,7 +7,7 @@
  */
 import { expect, test } from "bun:test";
 
-import type { WorkflowArg } from "@mastro/core";
+import type { WorkflowArg } from "@depop/core";
 
 import { buildArgsMap, flagFromWorkflowArg, parseArgs, UsageError } from "../src/args.ts";
 

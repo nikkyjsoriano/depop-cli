@@ -17,7 +17,7 @@ export function renderBootstrapPage(session: SessionPayload): string {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>mastro · connect ${escapeHtml(session.displayName)}</title>
+  <title>depop cli — capturing ${escapeHtml(session.displayName)}</title>
   <style>
     :root { color-scheme: light dark; }
     body {
@@ -40,10 +40,10 @@ export function renderBootstrapPage(session: SessionPayload): string {
 </head>
 <body>
   <h1>Connecting ${escapeHtml(session.displayName)}</h1>
-  <p class="muted">mastro is capturing your ${escapeHtml(session.displayName)} session.</p>
+  <p class="muted">The depop CLI is capturing your ${escapeHtml(session.displayName)} session.</p>
 
   <div class="card">
-    <div class="status"><span class="dot" id="dot"></span><span id="status">Waiting for the mastro extension…</span></div>
+    <div class="status"><span class="dot" id="dot"></span><span id="status">Waiting for the depop extension…</span></div>
     <p class="muted" id="hint">Keep this tab open. A ${escapeHtml(session.displayName)} tab will open next — log in if asked.</p>
   </div>
 
@@ -57,13 +57,13 @@ export function renderBootstrapPage(session: SessionPayload): string {
     </ol>
   </div>
 
-  <script type="application/json" id="mastro-session">${payloadJson}</script>
+  <script type="application/json" id="depop-session">${payloadJson}</script>
   <script>
     // If the extension is present, content-localhost.js sets this flag.
     setTimeout(function () {
-      if (!window.__mastroExtensionPresent) {
+      if (!window.__depopExtensionPresent) {
         document.getElementById('install').hidden = false;
-        document.getElementById('status').textContent = 'mastro extension not found';
+        document.getElementById('status').textContent = 'depop extension not found';
         document.getElementById('dot').className = 'dot err';
       }
     }, 1500);

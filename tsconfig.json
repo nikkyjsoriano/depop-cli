@@ -2,8 +2,8 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "paths": {
-      "@mastro/core": ["./packages/core/src/index.ts"],
-      "@mastro/sdk": ["./packages/sdk/src/index.ts"]
+      "@depop/core": ["./packages/core/src/index.ts"],
+      "@depop/sdk": ["./packages/sdk/src/index.ts"]
     }
   },
   "include": ["packages/*/src/**/*", "packages/*/test/**/*"]

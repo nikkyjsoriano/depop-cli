@@ -1,16 +1,16 @@
 /**
- * Connector — replays a persisted credential against a provider's OpenAPI spec.
+ * Connector — replays the persisted credential against the OpenAPI spec.
  *
- * Given a Provider (auth manifest + OpenAPI spec) and a CredentialStore, it:
+ * Given a Definition (auth manifest + OpenAPI spec) and a CredentialStore, it:
  *   - loads + freshness-checks the credential,
  *   - builds a request from an OpenAPI operation + parsed CLI args
  *     (query/path/body params, OpenAPI array style/explode, enum constraints),
- *   - resolves any x-mastro-resolve parameters against their taxonomy endpoint,
- *   - applies x-mastro-auth (header/cookie templates, ${uuid}/${now} generators),
- *   - sends it through the right transport (impersonating if required),
+ *   - resolves any x-depop-resolve parameters against their taxonomy endpoint,
+ *   - applies x-depop-auth (header/cookie templates, ${uuid}/${now} generators),
+ *   - sends it through the right transport (browser proxy or direct fetch),
  *   - maps response status to ok / retry / recapture.
  *
- * It knows nothing provider-specific — everything comes from the OpenAPI doc.
+ * It hard-codes nothing about Depop — everything comes from the OpenAPI doc.
  */
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -20,35 +20,34 @@ import {
   isExpired,
   unixNow,
   type CredentialStore,
+  type Definition,
   type OpenApiSpec,
   type OperationView,
   type Parameter,
-  type Provider,
   type ValidationResult,
-} from "@mastro/core";
+} from "@depop/core";
 
 import { BrowserTransport } from "./browser-transport.ts";
 import { JsonCache } from "./cache.ts";
-import { extractItems } from "./extract.ts";
 import { Resolver, type MetadataFetcher } from "./resolver.ts";
 import { WorkflowRunner } from "./workflow.ts";
 import { renderDeep, renderStringMap, renderTemplate, type TemplateContext } from "./template.ts";
-import { selectTransport, type HttpResponse, type Transport } from "./transport.ts";
+import { FetchTransport, type HttpResponse, type Transport } from "./transport.ts";
 import { throttled } from "./throttle.ts";
-import { getPath, metaRefreshUrl, parseMaybeJson, sleep } from "./util.ts";
+import { getPath, parseMaybeJson, sleep } from "./util.ts";
 
 export class NotAuthenticatedError extends Error {
-  constructor(public readonly providerId: string, message?: string) {
-    super(message ?? `not authenticated for "${providerId}". Run: mastro login ${providerId}`);
+  constructor(message = "not logged in. Run: depop login") {
+    super(message);
     this.name = "NotAuthenticatedError";
   }
 }
 
 export class RecaptureRequiredError extends Error {
-  constructor(public readonly providerId: string, public readonly status: number) {
+  constructor(public readonly status: number) {
     super(
-      `${providerId} rejected the request (HTTP ${status}). Your session likely expired.\n` +
-        `Run: mastro login ${providerId}`,
+      `Depop rejected the request (HTTP ${status}). Your session likely expired.\n` +
+        `Run: depop login`,
     );
     this.name = "RecaptureRequiredError";
   }
@@ -65,7 +64,7 @@ export interface CallResult {
   status: number;
   /** Parsed JSON if the body was JSON, else the raw text. */
   data: unknown;
-  /** The slice of `data` at the operation's x-mastro-result path, if set. */
+  /** The slice of `data` at the operation's x-depop-result path, if set. */
   result: unknown;
 }
 
@@ -77,39 +76,36 @@ export class Connector {
   private readonly resolver: Resolver;
 
   private constructor(
-    private readonly provider: Provider,
+    private readonly definition: Definition,
     private readonly spec: OpenApiSpec,
     private readonly credential: { fields: Record<string, unknown> },
   ) {
     this.resolver = new Resolver(
-      new JsonCache(provider.id),
+      new JsonCache(),
       (operationId) => this.fetchMetadata(operationId),
-      (relPath) => JSON.parse(readFileSync(join(provider.dir, relPath), "utf8")),
+      (relPath) => JSON.parse(readFileSync(join(definition.dir, relPath), "utf8")),
     );
   }
 
   /** Build a connector, loading + checking the credential up front. */
-  static load(provider: Provider, store: CredentialStore): Connector {
-    const credential = store.get(provider.id);
-    if (!credential) throw new NotAuthenticatedError(provider.id);
+  static load(definition: Definition, store: CredentialStore): Connector {
+    const credential = store.get();
+    if (!credential) throw new NotAuthenticatedError();
     if (isExpired(credential)) {
-      throw new NotAuthenticatedError(
-        provider.id,
-        `session for "${provider.id}" expired. Run: mastro login ${provider.id}`,
-      );
+      throw new NotAuthenticatedError("your session expired. Run: depop login");
     }
-    return Connector.forCredential(provider, credential);
+    return Connector.forCredential(definition, credential);
   }
 
   /**
    * Build a connector against an explicit credential, bypassing the store. Used
    * to verify a freshly-captured credential before it's persisted.
    */
-  static forCredential(provider: Provider, credential: { fields: Record<string, unknown> }): Connector {
-    if (!provider.spec) {
-      throw new Error(`provider "${provider.id}" has no OpenAPI spec; nothing to call`);
-    }
-    return new Connector(provider, provider.spec, credential);
+  static forCredential(
+    definition: Definition,
+    credential: { fields: Record<string, unknown> },
+  ): Connector {
+    return new Connector(definition, definition.spec, credential);
   }
 
   /** Operations exposed as CLI subcommands. */
@@ -122,7 +118,7 @@ export class Connector {
   }
 
   /**
-   * Probe the live session by calling the spec's `x-mastro-auth.verify`
+   * Probe the live session by calling the spec's `x-depop-auth.verify`
    * operation. Returns a structured result (never throws): `ok: true` on a 2xx,
    * `ok: false` with a reason otherwise. Used right after capture so a stored
    * credential's `validation` reflects whether it actually works.
@@ -165,7 +161,7 @@ export class Connector {
   }
 
   /**
-   * Run a multi-step workflow operation (x-mastro-workflow). With `dryRun`, the
+   * Run a multi-step workflow operation (x-depop-workflow). With `dryRun`, the
    * runner builds and returns the planned requests/body without sending them.
    */
   async runWorkflow(
@@ -179,14 +175,14 @@ export class Connector {
       authHeaders: () => this.authHeaders(),
       baseContext: () => this.authContext(),
       apiTransport: () => this.getTransport(),
-      loadFile: (relPath) => JSON.parse(readFileSync(join(this.provider.dir, relPath), "utf8")),
+      loadFile: (relPath) => JSON.parse(readFileSync(join(this.definition.dir, relPath), "utf8")),
       dryRun: opts.dryRun ?? false,
     });
     return runner.run(op, resolved);
   }
 
   /**
-   * Translate workflow args that carry x-mastro-resolve (label → wire value).
+   * Translate workflow args that carry x-depop-resolve (label → wire value).
    * A `key_template` arg is *derived* from other args (e.g. variant_set from
    * department+type) even when the user didn't pass it.
    */
@@ -195,8 +191,8 @@ export class Connector {
     args: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
     const out = { ...args };
-    for (const arg of op.operation["x-mastro-args"] ?? []) {
-      const resolve = arg["x-mastro-resolve"];
+    for (const arg of op.operation["x-depop-args"] ?? []) {
+      const resolve = arg["x-depop-resolve"];
       if (!resolve) continue;
 
       if (resolve.key_template) {
@@ -228,15 +224,13 @@ export class Connector {
         .join("; ");
       if (cookie) headers["cookie"] = cookie;
     }
-    const ua = this.spec.replay().user_agent;
-    if (ua) headers["user-agent"] = String(renderStringMap({ ua }, ctx).ua);
     return headers;
   }
 
   /** Invoke an operation with parsed CLI args (flag name → value). */
   async call(op: OperationView, args: Record<string, unknown>): Promise<CallResult> {
     const url = await this.buildUrl(op, args);
-    const headers = this.buildHeaders(op, args);
+    const headers = this.buildHeaders(op);
     const body = this.buildBody(op, args);
 
     const transport = await this.getTransport();
@@ -248,49 +242,31 @@ export class Connector {
     });
     this.checkStatus(status, text);
 
-    // An HTML-only operation declares x-mastro-extract: the structured items
-    // become the data (nobody wants the raw page back).
-    const extract = op.operation["x-mastro-extract"];
-    const data = extract ? await extractItems(text, extract) : parseMaybeJson(text);
-    const resultPath = op.operation["x-mastro-result"];
+    const data = parseMaybeJson(text);
+    const resultPath = op.operation["x-depop-result"];
     const result = resultPath ? getPath(data, resultPath) : data;
 
-    // An extract that found nothing on a 2xx is opaque (empty array, no error).
-    // MASTRO_DEBUG dumps the raw response so a drifted page shape is diagnosable.
-    if (process.env.MASTRO_DEBUG) {
-      console.error(`[mastro-debug] ${op.command ?? op.id} → HTTP ${status}, ${text.length} bytes`);
-      console.error(`[mastro-debug] body head:`, text.slice(0, 2000));
-      if (process.env.MASTRO_DEBUG_DUMP) {
-        await Bun.write(process.env.MASTRO_DEBUG_DUMP, text);
-        console.error(`[mastro-debug] full body → ${process.env.MASTRO_DEBUG_DUMP}`);
+    // A 2xx whose body drifted from the spec is opaque (a null result, no
+    // error). DEPOP_DEBUG dumps the raw response so that's diagnosable.
+    if (process.env.DEPOP_DEBUG) {
+      console.error(`[depop-debug] ${op.command ?? op.id} → HTTP ${status}, ${text.length} bytes`);
+      console.error(`[depop-debug] body head:`, text.slice(0, 2000));
+      if (process.env.DEPOP_DEBUG_DUMP) {
+        await Bun.write(process.env.DEPOP_DEBUG_DUMP, text);
+        console.error(`[depop-debug] full body → ${process.env.DEPOP_DEBUG_DUMP}`);
       }
     }
 
     return { status, data, result };
   }
 
-  /**
-   * Send a request and read its body, following an HTML meta-refresh
-   * interstitial when the spec opts in (Akamai-style bot walls answer with a
-   * stub page that refreshes to the same URL plus a one-time token).
-   */
+  /** Send a request (retrying the spec's `retry_on` statuses) and read its body. */
   private async request(
     transport: Transport,
     req: Parameters<Transport["send"]>[0],
   ): Promise<{ status: number; text: string }> {
-    let res = await this.sendWithRetry(transport, req);
-    let text = await res.text();
-
-    if (this.spec.replay().follow_html_refresh) {
-      for (let hop = 0; hop < 2; hop++) {
-        const target = metaRefreshUrl(text);
-        if (!target) break;
-        const url = new URL(target, req.url).toString();
-        res = await this.sendWithRetry(transport, { method: "GET", url, headers: req.headers });
-        text = await res.text();
-      }
-    }
-    return { status: res.status, text };
+    const res = await this.sendWithRetry(transport, req);
+    return { status: res.status, text: await res.text() };
   }
 
   // -- request construction --------------------------------------------------
@@ -330,37 +306,22 @@ export class Connector {
     return def;
   }
 
-  /** Resolve a parameter's value(s), translating labels→wire via x-mastro-resolve. */
+  /** Resolve a parameter's value(s), translating labels→wire via x-depop-resolve. */
   private async resolveParamValues(param: Parameter, raw: unknown): Promise<string[]> {
     const inputs = Array.isArray(raw) ? raw.map(String) : [String(raw)];
-    const resolve = param["x-mastro-resolve"];
+    const resolve = param["x-depop-resolve"];
     if (!resolve) return inputs;
     return Promise.all(inputs.map((v) => this.resolver.resolveValue(resolve, v)));
   }
 
-  private buildHeaders(op: OperationView, args: Record<string, unknown> = {}): Record<string, string> {
+  private buildHeaders(op: OperationView): Record<string, string> {
     const headers: Record<string, string> = { accept: "*/*", ...this.authHeaders() };
     const reqBody = op.operation.requestBody;
     if (reqBody) headers["content-type"] = firstContentType(reqBody) ?? "application/json";
-    // Per-operation header overrides win over the global auth headers (so an
-    // SDUI op can swap the Voyager `accept` for its own and add `x-li-rsc-*`).
-    const opHeaders = op.operation["x-mastro-headers"];
-    if (opHeaders) Object.assign(headers, renderStringMap(opHeaders, this.callContext(args)));
     return headers;
   }
 
   private buildBody(op: OperationView, args: Record<string, unknown>): string | undefined {
-    // A raw body template (x-mastro-body) wins: a fixed envelope that can't be
-    // assembled from `parameters` (server-driven-UI search posts a big static
-    // payload with only a flag or two varying). Deep-resolve it against args +
-    // auth; a string template is sent verbatim, an object is JSON-serialized.
-    const rawBody = op.operation["x-mastro-body"];
-    if (rawBody !== undefined) {
-      const ctx = this.callContext(args);
-      const rendered = renderDeep(rawBody, ctx);
-      return typeof rendered === "string" ? rendered : JSON.stringify(rendered);
-    }
-
     const reqBody = op.operation.requestBody;
     if (!reqBody) return undefined;
 
@@ -390,17 +351,12 @@ export class Connector {
     };
   }
 
-  /** Auth context plus the call's CLI args, for `${args.*}` in a raw body. */
-  private callContext(args: Record<string, unknown>): TemplateContext {
-    return { ...this.authContext(), args };
-  }
-
-  // -- metadata fetch (for x-mastro-resolve) --------------------------------
+  // -- metadata fetch (for x-depop-resolve) --------------------------------
 
   /** Fetch a taxonomy/metadata operation's raw body, by operationId. */
   private async fetchMetadata(operationId: string): Promise<unknown> {
     const op = this.spec.byOperationId(operationId);
-    if (!op) throw new Error(`x-mastro-resolve references unknown operation "${operationId}"`);
+    if (!op) throw new Error(`x-depop-resolve references unknown operation "${operationId}"`);
     const url = await this.buildUrl(op, {});
     const transport = await this.getTransport();
     const { status, text } = await this.request(transport, {
@@ -420,9 +376,7 @@ export class Connector {
   private async getTransport(): Promise<Transport> {
     if (!this.transport) {
       const replay = this.spec.replay();
-      this.baseTransport = replay.via_browser
-        ? new BrowserTransport()
-        : await selectTransport(replay.impersonate_browser ?? false);
+      this.baseTransport = replay.via_browser ? new BrowserTransport() : new FetchTransport();
       // Pace every replayed request to the provider's declared budget. One
       // bucket per connector so a workflow's foreach and the main call share it.
       this.transport = throttled(this.baseTransport, replay.rate_limit?.requests_per_minute);
@@ -453,7 +407,7 @@ export class Connector {
 
   private checkStatus(status: number, body: string): void {
     const recaptureOn = new Set(this.spec.replay().recapture_on ?? []);
-    if (recaptureOn.has(status)) throw new RecaptureRequiredError(this.provider.id, status);
+    if (recaptureOn.has(status)) throw new RecaptureRequiredError(status);
     if (status < 200 || status >= 300) throw new ApiError(status, body);
   }
 }

@@ -6,18 +6,18 @@ info:
     Reverse-engineered from depop.com browser traffic (see README). Operational,
     not a stable contract. The standard OpenAPI parts (paths, params, enums,
     array style) are valid OpenAPI 3.1; the browser-replay specifics live in
-    the x-mastro-* extensions, which conformant validators ignore.
+    the x-depop-* extensions, which conformant validators ignore.
 
 servers:
   - url: https://www.depop.com
 
-# --- replay choreography (mastro extension) --------------------------------
+# --- replay choreography (depop extension) --------------------------------
 # Depop's webapi sits behind Cloudflare Bot Management (JA3/JA4 fingerprinting),
 # so requests must go through a browser-impersonating transport.
 # Depop sits behind a Cloudflare *managed challenge* (a JS interstitial), which
 # TLS impersonation can't solve — so run requests through the extension's
 # authenticated tab instead. See docs/BROWSER-PROXY.md.
-x-mastro-replay:
+x-depop-replay:
   via_browser: true
   retry_on: [429, 503]
   recapture_on: [401, 419]
@@ -27,9 +27,9 @@ x-mastro-replay:
 # --- how a captured session becomes a live request -------------------------
 # access_token + user_id are captured from depop.com cookies (see auth.manifest).
 # The depop-* ids are client-generated per request.
-x-mastro-auth:
+x-depop-auth:
   required_fields: [access_token, user_id]
-  # After capture, mastro calls this cheap read-only op once to confirm the
+  # After capture, depop calls this cheap read-only op once to confirm the
   # session actually works (not just that the cookies are present), and stores
   # the real result in the credential. A 401/419 here means re-login.
   verify:
@@ -60,14 +60,14 @@ paths:
   /presentation/api/v1/search/products/:
     get:
       operationId: search
-      x-mastro-command: search
+      x-depop-command: search
       summary: Search Depop listings.
       description: >
         Cursor-paginated product search. Filters mirror the website's filter
         bar (category, brand, price, size, colour, condition, sort, on-sale).
         `sizes` / `categories` / `brandIds` accept either the wire id or a
         human label (resolved against the filter-metadata endpoints).
-      x-mastro-result: objects
+      x-depop-result: objects
       parameters:
         - name: what
           in: query
@@ -100,7 +100,7 @@ paths:
           description: Category filter (repeatable). Department or product-type id.
           explode: true
           schema: { type: array, items: { type: string } }
-          x-mastro-resolve:
+          x-depop-resolve:
             from: categoryFilters
             value_path: categoryFilters[].children[].id
             label_path: categoryFilters[].children[].name
@@ -110,7 +110,7 @@ paths:
           description: Brand filter (repeatable). Numeric brand id or brand name.
           explode: true
           schema: { type: array, items: { type: string } }
-          x-mastro-resolve:
+          x-depop-resolve:
             from: brandsById
             value_path: brands[].id
             label_path: brands[].name
@@ -120,7 +120,7 @@ paths:
           description: Size filter (repeatable). Composite size id or label (e.g. "M").
           explode: true
           schema: { type: array, items: { type: string } }
-          x-mastro-resolve:
+          x-depop-resolve:
             from: sizeFilters
             value_path: "[].children[].children[].composite_id"
             label_path: "[].children[].children[].name"
@@ -192,7 +192,7 @@ paths:
   /api/v1/users/{user_id}/:
     get:
       operationId: me
-      x-mastro-command: me
+      x-depop-command: me
       summary: Show the logged-in user's profile.
       parameters:
         - name: user_id
@@ -207,17 +207,17 @@ paths:
   # List an item — a multi-step workflow (upload pics → poll → create listing)
   # The workflow itself is a synthetic path; its steps call the real endpoints.
   # =========================================================================
-  /x-mastro/list:
+  /x-depop/list:
     post:
       operationId: list
-      x-mastro-command: list
+      x-depop-command: list
       summary: List an item for sale.
       description: >
         Uploads each photo, waits for processing, then creates the listing.
         Photos must already be square JPEGs (the depop-list-item skill handles
         HEIC→JPEG + cropping). Use --dry-run to preview the request bodies
         without uploading or posting.
-      x-mastro-args:
+      x-depop-args:
         - { name: photo, description: "image file (repeatable, first = cover)", required: true, multiple: true }
         - { name: brand, description: "brand slug, e.g. polo-ralph-lauren", required: true }
         - { name: department, description: "menswear / womenswear / kidswear / everything-else", required: true,
@@ -234,24 +234,24 @@ paths:
         - { name: style, description: "e.g. streetwear (repeatable, up to 3)", multiple: true }
         - { name: source, description: "e.g. preloved (repeatable, up to 2)", multiple: true }
         - { name: variant-set, description: "size set id (derived from department/type)",
-            x-mastro-resolve: { from: "file:reference/categories.json", keyed: true, value_path: size_set_us,
+            x-depop-resolve: { from: "file:reference/categories.json", keyed: true, value_path: size_set_us,
                                 key_template: "${args.department}/${args.type}" } }
         # Variant member id within the size set — the second half of the size
         # mapping (variant-set is the set; this is the member within it). Keyed
         # by "<size_set>/<size>" so it resolves only after variant-set above.
         # Empty when no --size (one-size items) → variants stays {}.
         - { name: variant, description: "size variant id (derived from size set + size)",
-            x-mastro-resolve: { from: "file:reference/size_variants.json", keyed: true,
+            x-depop-resolve: { from: "file:reference/size_variants.json", keyed: true,
                                 key_template: "${args.variant-set}/${args.size}" } }
         - { name: address-id, description: "ship-from address id", required: true }
         - { name: address, description: 'e.g. "San Francisco, United States"', required: true }
         - { name: lat, description: "geo latitude", required: true }
         - { name: lng, description: "geo longitude", required: true }
         - { name: gender, description: "male / female / unisex (derived from department)",
-            x-mastro-resolve: { from: "file:reference/department_gender.json", keyed: true,
+            x-depop-resolve: { from: "file:reference/department_gender.json", keyed: true,
                                 key_template: "${args.department}" } }
         - { name: parcel-size, description: "small/medium/large/xl/xxl (default medium)" }
-      x-mastro-workflow:
+      x-depop-workflow:
         result: createListing
         steps:
           # 1. Request an upload slot per photo (returns a presigned S3 URL).
@@ -340,7 +340,7 @@ paths:
                 age: "${args.age|[]}"
                 style: "${args.style|[]}"
                 source: "${args.source|[]}"
-                # Boost is pinned OFF. mastro never enables a paid/free boost on
+                # Boost is pinned OFF. depop never enables a paid/free boost on
                 # a listing by itself; making it a real choice is separate work,
                 # and until then the safe value is the one that costs nothing and
                 # surprises nobody. Do not template this off a flag.
@@ -390,7 +390,7 @@ paths:
   # centroid on every save; matching that is matching reality.
   #
   # No boost field appears in an edit payload at all. Boosting is a separate
-  # endpoint (/presentation/api/v1/boost/shop/) that mastro never calls.
+  # endpoint (/presentation/api/v1/boost/shop/) that depop never calls.
   #
   # Not editable here, and why:
   #   photos       picture_ids are preserved verbatim; replacing them needs the
@@ -402,18 +402,18 @@ paths:
   #   is_kids      moving a listing into or out of kidswear needs is_kids sent
   #                alongside the department, which has no mapping here yet.
   # =========================================================================
-  /x-mastro/update:
+  /x-depop/update:
     post:
       operationId: update
-      x-mastro-command: update
+      x-depop-command: update
       summary: Update an existing listing (all fields except photos).
       description: >
         Reads the listing, applies the flags you passed, and PUTs the whole
         object back the way Depop's own edit form does. Fields you leave out
         keep their current values. Takes the listing slug positionally, e.g.
-        `mastro depop update dudu-bear-asics-gel-1130-543c --price 110`. The
+        `depop update dudu-bear-asics-gel-1130-543c --price 110`. The
         slug is the last path segment of the listing URL.
-      x-mastro-args:
+      x-depop-args:
         - { name: slug, description: "listing slug, the last path segment of the listing URL", required: true }
         - { name: price, description: "new numeric price, e.g. 110" }
         # Amount and currency are one price on the listing: switching the
@@ -447,15 +447,15 @@ paths:
         # Derived exactly as in the list workflow: department/type → size set,
         # then size set + size → the variant member id, and department → gender.
         - { name: variant-set, description: "size set id (derived from department/type)",
-            x-mastro-resolve: { from: "file:reference/categories.json", keyed: true, value_path: size_set_us,
+            x-depop-resolve: { from: "file:reference/categories.json", keyed: true, value_path: size_set_us,
                                 key_template: "${args.department}/${args.type}" } }
         - { name: variant, description: "size variant id (derived from size set + size)",
-            x-mastro-resolve: { from: "file:reference/size_variants.json", keyed: true,
+            x-depop-resolve: { from: "file:reference/size_variants.json", keyed: true,
                                 key_template: "${args.variant-set}/${args.size}" } }
         - { name: gender, description: "male / female / unisex (derived from department)",
-            x-mastro-resolve: { from: "file:reference/department_gender.json", keyed: true,
+            x-depop-resolve: { from: "file:reference/department_gender.json", keyed: true,
                                 key_template: "${args.department}" } }
-      x-mastro-workflow:
+      x-depop-workflow:
         # The PUT answers 204 with no body, so the command returns a fresh read
         # of the listing instead: confirmation of what it now looks like.
         result: verify
@@ -552,7 +552,7 @@ paths:
   /presentation/api/v1/listing/products/:
     post:
       operationId: createListing
-      x-mastro-hidden: true
+      x-depop-hidden: true
       summary: Create the listing (final step of the list workflow).
       responses:
         "201": { description: Listing created. }
@@ -561,7 +561,7 @@ paths:
   /presentation/api/v1/products/by-slug/{slug}/edit-listing/:
     get:
       operationId: getListingForEdit
-      x-mastro-hidden: true
+      x-depop-hidden: true
       summary: Read a listing the way the seller edit form does.
       description: >
         The read half of an edit. Returns the listing's current field values,
@@ -576,7 +576,7 @@ paths:
   /presentation/api/v1/products/by-slug/{slug}/:
     put:
       operationId: updateListing
-      x-mastro-hidden: true
+      x-depop-hidden: true
       summary: Replace the listing (the write half of the update workflow).
       description: >
         Replaces the whole product. Every field must be present or it is
@@ -589,7 +589,7 @@ paths:
   /api/v4/pictures/:
     post:
       operationId: uploadPicture
-      x-mastro-hidden: true
+      x-depop-hidden: true
       summary: Request an S3 upload slot for a product picture.
       responses:
         "201": { description: Presigned upload URL. }
@@ -598,7 +598,7 @@ paths:
   /s3-put:
     put:
       operationId: s3Put
-      x-mastro-hidden: true
+      x-depop-hidden: true
       summary: PUT image bytes to a presigned S3 URL.
       responses:
         "200": { description: Uploaded. }
@@ -606,7 +606,7 @@ paths:
   /internal/v1/pictures/validate/:
     post:
       operationId: validatePictures
-      x-mastro-hidden: true
+      x-depop-hidden: true
       summary: Validate uploaded pictures.
       responses:
         "200": { description: Validation accepted. }
@@ -614,7 +614,7 @@ paths:
   /api/v1/pictures/batch/{ids}/:
     get:
       operationId: pictureBatch
-      x-mastro-hidden: true
+      x-depop-hidden: true
       summary: Poll picture processing status.
       parameters:
         - { name: ids, in: path, required: true, schema: { type: string } }
@@ -622,12 +622,12 @@ paths:
         "200": { description: Picture batch status. }
 
   # =========================================================================
-  # Filter-metadata endpoints — hidden from the CLI, used by x-mastro-resolve
+  # Filter-metadata endpoints — hidden from the CLI, used by x-depop-resolve
   # =========================================================================
   /presentation/api/v1/search/sizeFilters/:
     get:
       operationId: sizeFilters
-      x-mastro-hidden: true
+      x-depop-hidden: true
       summary: Size taxonomy (department → category → size-set → size).
       responses:
         "200": { description: Size filter tree. }
@@ -635,7 +635,7 @@ paths:
   /api/v3/search/categoryFilters/:
     get:
       operationId: categoryFilters
-      x-mastro-hidden: true
+      x-depop-hidden: true
       summary: Category taxonomy (department → product category).
       responses:
         "200": { description: Category filter tree. }
@@ -643,7 +643,7 @@ paths:
   /api/v2/search/attributes/brands/byId/:
     get:
       operationId: brandsById
-      x-mastro-hidden: true
+      x-depop-hidden: true
       summary: Brand id ↔ name lookup.
       responses:
         "200": { description: Brand list. }
@@ -651,7 +651,7 @@ paths:
   /api/v2/search/filters/filterProductAttributes/:
     get:
       operationId: filterAttributes
-      x-mastro-hidden: true
+      x-depop-hidden: true
       summary: Condition + colour attribute metadata.
       parameters:
         - name: country

@@ -1,12 +1,12 @@
 ---
-name: mastro-depop-search
-description: Search Depop listings from the command line via the mastro CLI. Use when the user wants to find, browse, compare, or price-check secondhand fashion items on Depop ("what's a fair price for a vintage Carhartt jacket on Depop?", "find me black Nike trainers size 9").
+name: depop-search
+description: Search Depop listings from the command line via the depop CLI. Use when the user wants to find, browse, compare, or price-check secondhand fashion items on Depop ("what's a fair price for a vintage Carhartt jacket on Depop?", "find me black Nike trainers size 9").
 ---
 
 # Search Depop
 
-Agent-facing playbook for searching Depop listings via `mastro`. If `mastro`
-is not on PATH, invoke it as `npx -y mastro-connect`.
+Agent-facing playbook for searching Depop listings via `depop`. If `depop`
+is not on PATH, invoke it as `npx -y depop-cli`.
 
 ## When to use
 
@@ -16,17 +16,17 @@ items on Depop ("what's a fair price for a vintage Carhartt jacket on Depop?",
 
 ## Preconditions
 
-- `mastro login depop` has been run (check `mastro status --json` →
-  `depop.state == "active"`). If expired/absent, ask the user to run
-  `mastro login depop` (it needs the browser).
+- `depop login` has been run (check `depop status --json` → `logged_in` is
+  true and `state` is `"active"`). If expired/absent, ask the user to run
+  `depop login` (it needs the browser).
 
 ## Command
 
 ```bash
-mastro depop search "<query>" [filters...] --json
+depop search "<query>" [filters...] --json
 ```
 
-Run `mastro depop search --help` for the live flag list (it's generated from the
+Run `depop search --help` for the live flag list (it's generated from the
 spec). The filters mirror the website's filter bar:
 
 - `--sizes`, `--brandIds`, `--categories` — repeatable; accept an id **or** a
@@ -48,5 +48,5 @@ listing URL as `https://www.depop.com/products/<slug>/`.
 - For a price estimate, search the specific item, filter out `isSold` if you
   only want live listings, and report the median of the first page.
 - If you get an auth error, the session expired — tell the user to re-run
-  `mastro login depop`.
+  `depop login`.
 - Respect the rate limit (30 req/min); batch thoughtfully.

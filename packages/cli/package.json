@@ -1,18 +1,18 @@
 {
-  "name": "@mastro/cli",
+  "name": "@depop/cli",
   "version": "0.1.0",
   "type": "module",
-  "description": "The mastro command-line interface for unofficial web-app connectors.",
+  "description": "The depop CLI — drive your logged-in Depop session from the terminal.",
   "license": "MIT",
   "bin": {
-    "mastro": "./src/bin.ts"
+    "depop": "./src/bin.ts"
   },
   "exports": {
     ".": "./src/cli.ts"
   },
   "dependencies": {
-    "@mastro/core": "workspace:*",
-    "@mastro/sdk": "workspace:*",
+    "@depop/core": "workspace:*",
+    "@depop/sdk": "workspace:*",
     "picocolors": "^1.1.1"
   }
 }

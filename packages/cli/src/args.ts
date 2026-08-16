@@ -8,9 +8,9 @@
  *   --no-flag        → { flag: false }
  *
  * Works off a normalized `CliFlag[]` derived from either an operation's OpenAPI
- * parameters or a workflow's x-mastro-args.
+ * parameters or a workflow's x-depop-args.
  */
-import type { Parameter, WorkflowArg } from "@mastro/core";
+import type { Parameter, WorkflowArg } from "@depop/core";
 
 /** Normalized CLI flag — the common shape parameters and workflow args map to. */
 export interface CliFlag {
@@ -40,7 +40,7 @@ export function flagFromParameter(p: Parameter): CliFlag {
     multiple: p.schema?.type === "array",
     boolean: p.schema?.type === "boolean",
     enum: (p.schema?.enum ?? p.schema?.items?.enum)?.map(String),
-    resolvable: p["x-mastro-resolve"] !== undefined,
+    resolvable: p["x-depop-resolve"] !== undefined,
   };
 }
 
@@ -54,7 +54,7 @@ export function flagFromWorkflowArg(a: WorkflowArg): CliFlag {
     boolean: a.boolean ?? false,
     enum: a.enum,
     requires: a.requires,
-    resolvable: a["x-mastro-resolve"] !== undefined,
+    resolvable: a["x-depop-resolve"] !== undefined,
   };
 }
 

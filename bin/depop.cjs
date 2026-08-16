@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // @ts-check
 /**
- * Node-compatible launcher for the mastro CLI.
+ * Node-compatible launcher for the depop CLI.
  *
  * The CLI runs on Bun (it uses Bun.serve / Bun.YAML / Bun.spawn), but npx and
  * global installs execute bins with Node. This shim hands off to Bun, and
@@ -22,14 +22,14 @@ const result = spawnSync("bun", [entry, ...process.argv.slice(2)], { stdio: "inh
 
 if (result.error && /** @type {NodeJS.ErrnoException} */ (result.error).code === "ENOENT") {
   console.error(
-    "mastro needs the Bun runtime (it drives a local capture server Bun provides).\n" +
+    "depop needs the Bun runtime (it drives a local capture server Bun provides).\n" +
       "Install it once:  curl -fsSL https://bun.sh/install | bash   (or: brew install oven-sh/bun/bun)\n" +
       "Then re-run this command.",
   );
   process.exit(1);
 }
 if (result.error) {
-  console.error(`mastro failed to start: ${result.error.message}`);
+  console.error(`depop failed to start: ${result.error.message}`);
   process.exit(1);
 }
 process.exit(result.status === null ? 1 : result.status);

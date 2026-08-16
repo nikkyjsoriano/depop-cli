@@ -1,4 +1,4 @@
-# Multi-step workflows (`x-mastro-workflow`)
+# Multi-step workflows (`x-depop-workflow`)
 
 OpenAPI describes single request/response operations. Some connector commands
 are *stateful sequences* — e.g. Depop's "list an item": upload each photo, PUT
@@ -6,27 +6,27 @@ the bytes to a presigned URL, poll until processed, then create the listing,
 with the numeric picture ids (derived from the upload slots) feeding the final
 body.
 
-`x-mastro-workflow` models that declaratively, in the OpenAPI doc. The command's
+`x-depop-workflow` models that declaratively, in the OpenAPI doc. The command's
 own path/method isn't called; its **steps** are.
 
 ## Shape
 
 ```yaml
-/x-mastro/list:                 # synthetic path — the workflow wrapper
+/x-depop/list:                 # synthetic path — the workflow wrapper
   post:
     operationId: list
-    x-mastro-command: list
-    x-mastro-args:              # workflow flags (no OpenAPI parameters of its own)
+    x-depop-command: list
+    x-depop-args:              # workflow flags (no OpenAPI parameters of its own)
       - { name: photo, required: true, multiple: true }
       - { name: department, enum: [menswear, womenswear, ...] }
       - { name: size, requires: [department, type] }  # flags that only work together
       - { name: variant-set,   # a DERIVED flag, looked up from other args
-          x-mastro-resolve:
+          x-depop-resolve:
             from: "file:reference/categories.json"
             keyed: true
             value_path: size_set_us
             key_template: "${args.department}/${args.type}" }
-    x-mastro-workflow:
+    x-depop-workflow:
       result: createListing     # which step's response the command returns
       steps:
         - id: slots
@@ -90,9 +90,9 @@ Each step calls an operation (`operationId`) and stores its result under
       base: { price_amount: "${steps.current.pricing.original_price.total_price}", ... }
       body: { price_amount: "${?args.price}" }      # only the change
   ```
-- **`file` step** — load a JSON file bundled in the provider directory as the
+- **`file` step** — load a JSON file bundled in `spec/` as the
   step's result, with no HTTP call. Use for reference data a later step has to
-  index by something only known at run time, which an `x-mastro-resolve` arg
+  index by something only known at run time, which an `x-depop-resolve` arg
   can't do because those resolve before the flow runs:
 
   ```yaml
@@ -103,17 +103,6 @@ Each step calls an operation (`operationId`) and stores its result under
 
   Under `--dry-run` the file is still read (so a missing or broken one fails at
   plan time) but the step's result is a placeholder, like every other step.
-- **`request.form: { html, selector, set, unset }`** — build an
-  `application/x-www-form-urlencoded` body by replaying an HTML `<form>` from a
-  prior step's response. `html` is a template (usually `"${steps.<id>}"`),
-  `selector` picks the form (first match only — `querySelector` semantics, so
-  duplicate-id pages like Amazon's buy boxes work), `set` overrides/adds fields
-  (the clicked submit button, a JS-set flag), `unset` drops fields. The form is
-  serialized exactly as a browser would submit it (named non-button controls,
-  checked boxes only, selected option, textarea text), which captures a
-  server-rendered CSRF token and hidden fields verbatim. Use for state changes
-  gated behind a form (Amazon Buy Now → place-order). Mutually exclusive with
-  `body`.
 - **`output: { path, extract, coerce }`** — keep `response.<path>`; `extract`
   runs a regex and keeps the first capture group (e.g. pull a picture id from an
   S3 URL); `coerce: number` parses a numeric string into a JS number (so a later
@@ -135,7 +124,7 @@ dotted path into it, e.g. `createListing.slug`).
 
 ## Flags that only work together
 
-An `x-mastro-args` entry can declare `requires: [<other flags>]`. Some values
+An `x-depop-args` entry can declare `requires: [<other flags>]`. Some values
 only reach the wire through others: a Depop `--size` becomes a variant id derived
 from `--department` and `--type`, and a `--address-id` rides inside the shipping
 block that `--parcel-size` builds. On its own, such a flag would be dropped
@@ -175,11 +164,11 @@ flags that only exist when its guard passed.
 
 ## Deriving values from bundled data
 
-`x-mastro-resolve` works against **bundled JSON files** (`from: "file:..."`), not
+`x-depop-resolve` works against **bundled JSON files** (`from: "file:..."`), not
 just live endpoints. With `keyed: true` it's a key→entry lookup; with
 `key_template` the key is built from *other* args. This keeps reference-data
 transforms (category → size set, department → gender) declarative — no
-per-provider code. See `providers/depop/reference/`.
+per-connector code. See `spec/reference/`.
 
 Derived args resolve in declaration order, so a `key_template` can reference an
 earlier-derived arg. Depop chains two lookups for the size variant:

@@ -1,9 +1,9 @@
 /**
  * Evaluate a manifest completion rule against accumulated capture state.
- * Mirrors the CompletionRule type in @mastro/core.
+ * Mirrors the CompletionRule type in @depop/core.
  *
- * @param {MastroCompletionRule} rule
- * @param {MastroState} state
+ * @param {DepopCompletionRule} rule
+ * @param {DepopState} state
  * @param {Set<string>} seenHeaders   lower-cased header names observed so far
  * @returns {boolean}
  */

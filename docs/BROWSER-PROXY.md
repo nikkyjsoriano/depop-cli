@@ -14,7 +14,7 @@ tab's page context**, where Cloudflare already trusts the session, and relay the
 JSON back to the CLI.
 
 ```
-mastro depop search ...
+depop search ...
   → BrowserTransport (SDK)
   → POST  http://127.0.0.1:<port>/proxy/request        (CLI submits a request)
   → extension long-polls GET /proxy/poll               (picks up the request)
@@ -62,6 +62,6 @@ response lands. Everything is loopback-only and in-memory.
 
 ## Selection
 
-A provider opts in via `x-mastro-replay.via_browser: true`. The SDK then uses
+The spec opts in via `x-depop-replay.via_browser: true`. The SDK then uses
 `BrowserTransport` instead of curl/fetch. (Depop sets this.)
 ```

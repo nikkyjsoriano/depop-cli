@@ -1,7 +1,7 @@
-# mastro · connect — capture extension
+# depop cli — capture extension
 
 A **generic** MV3 extension. It interprets whatever `auth.manifest.json` the
-local `mastro` broker hands it — there is no per-provider code here.
+local `depop` broker hands it — there is no site-specific code here.
 
 ## Install (unpacked)
 
@@ -14,7 +14,7 @@ local `mastro` broker hands it — there is no per-provider code here.
 | File                   | Role |
 | ---------------------- | ---- |
 | `manifest.json`        | MV3 metadata + permissions. |
-| `content-localhost.js` | Runs on the mastro bootstrap page; reads the session payload and starts the worker. |
+| `content-localhost.js` | Runs on the depop bootstrap page; reads the session payload and starts the worker. |
 | `content-app.js`       | Runs on the target site; injects the page bridge and relays events — only for tabs in an active session. |
 | `page-bridge.js`       | Runs in the page's JS world; observes fetch/XHR responses and storage (size-capped). |
 | `background.js`        | The generic runtime: observes cookies/headers/page-events, evaluates the manifest's completion rule, serializes + posts the capture. |
@@ -36,4 +36,4 @@ of what to capture happens in the manifest the broker sends.
 - One session at a time, in memory only.
 - Capture is posted exactly once, only to the `127.0.0.1` receiver that started it.
 - Response bodies are capped at 64 KB before postback.
-- Tokens/cookies are redacted in the CLI's logs (see `@mastro/core`'s `redact`).
+- Tokens/cookies are redacted in the CLI's logs (see `@depop/core`'s `redact`).

@@ -1,4 +1,4 @@
-/** Public surface of @mastro/core. */
+/** Public surface of @depop/core. */
 export * from "./types.ts";
 export * from "./openapi.ts";
 export {
@@ -7,10 +7,10 @@ export {
   parseOpenApi,
   type OperationView,
 } from "./openapi-spec.ts";
-export { ProviderRegistry, ProviderNotFoundError, type Provider } from "./registry.ts";
+export { loadDefinition, DefinitionError, type Definition } from "./definition.ts";
 export {
   FileStore,
-  mastroHome,
+  depopHome,
   isExpired,
   unixNow,
   type CredentialStore,

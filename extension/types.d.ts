@@ -1,20 +1,20 @@
 /**
- * Shared types for the mastro capture extension.
+ * Shared types for the depop capture extension.
  *
- * These mirror the runtime contracts in `@mastro/core` (AuthManifest,
+ * These mirror the runtime contracts in `@depop/core` (AuthManifest,
  * CaptureBundle). They're declared here as ambient types so the plain-JS
  * extension files can be `checkJs`-verified without a bundler or imports.
  */
 
 // -- manifest (subset the extension actually reads) -------------------------
 
-interface MastroCookieRule {
+interface DepopCookieRule {
   url: string;
   include_names_matching: string[];
   save_as?: string;
 }
 
-interface MastroHeaderRule {
+interface DepopHeaderRule {
   source: "request" | "response";
   url_matches: string;
   is_regex?: boolean;
@@ -22,7 +22,7 @@ interface MastroHeaderRule {
   save_as?: string;
 }
 
-interface MastroPageEventRule {
+interface DepopPageEventRule {
   source: "fetch-response" | "xhr-response";
   url_matches: string;
   is_regex?: boolean;
@@ -30,23 +30,23 @@ interface MastroPageEventRule {
   save_as: string;
 }
 
-interface MastroStorageRule {
+interface DepopStorageRule {
   area: "local" | "session";
   keys?: string[];
   save_as?: string;
 }
 
-interface MastroCaptureSpec {
-  cookies?: MastroCookieRule[];
-  headers?: MastroHeaderRule[];
-  page_events?: MastroPageEventRule[];
-  storage?: MastroStorageRule[];
+interface DepopCaptureSpec {
+  cookies?: DepopCookieRule[];
+  headers?: DepopHeaderRule[];
+  page_events?: DepopPageEventRule[];
+  storage?: DepopStorageRule[];
 }
 
-type MastroCompletionRule =
-  | { all: MastroCompletionRule[] }
-  | { any: MastroCompletionRule[] }
-  | { not: MastroCompletionRule }
+type DepopCompletionRule =
+  | { all: DepopCompletionRule[] }
+  | { any: DepopCompletionRule[] }
+  | { not: DepopCompletionRule }
   | { field_present: string }
   | { cookie_present: string }
   | { cookie_name_prefix_present: string }
@@ -54,41 +54,41 @@ type MastroCompletionRule =
   | { storage_key_present: string }
   | { authenticated_response_seen: string };
 
-interface MastroSerializationSpec {
+interface DepopSerializationSpec {
   output_schema: string;
   fields: Record<string, string>;
 }
 
-interface MastroAuthManifest {
+interface DepopAuthManifest {
   schema_version: string;
   provider_id: string;
   display_name: string;
   launch: { url: string; open_tab?: boolean; expected_origins: string[]; timeout_seconds: number };
   permissions: { host_permissions: string[]; injects_page_bridge?: boolean };
-  capture: MastroCaptureSpec;
-  completion: MastroCompletionRule;
-  serialization: MastroSerializationSpec;
+  capture: DepopCaptureSpec;
+  completion: DepopCompletionRule;
+  serialization: DepopSerializationSpec;
   security: { redact_fields: string[]; allowed_postback_origin: string };
 }
 
 // -- session + state --------------------------------------------------------
 
-interface MastroSessionPayload {
+interface DepopSessionPayload {
   sessionId: string;
   providerId: string;
   displayName: string;
   launchUrl: string;
-  manifest: MastroAuthManifest;
+  manifest: DepopAuthManifest;
 }
 
-interface MastroCookie {
+interface DepopCookie {
   value: string;
   domain: string;
 }
 
 /** Accumulated observations during a capture session. */
-interface MastroState {
-  cookies: Record<string, MastroCookie>;
+interface DepopState {
+  cookies: Record<string, DepopCookie>;
   headers: Record<string, string>;
   storage: { local: Record<string, string>; session: Record<string, string> };
   /** Internal: URLs of successful authenticated responses. */
@@ -97,27 +97,27 @@ interface MastroState {
   [key: string]: unknown;
 }
 
-interface MastroSession {
+interface DepopSession {
   sessionId: string;
   providerId: string;
   receiverBaseUrl: string;
-  manifest: MastroAuthManifest;
+  manifest: DepopAuthManifest;
   launchUrl: string;
   appTabId: number | undefined;
   bootstrapTabId: number | undefined;
-  state: MastroState;
+  state: DepopState;
   seenHeaders: Set<string>;
   submitted: boolean;
 }
 
 // -- worker messages (content scripts → background) -------------------------
 
-type MastroMessage =
-  | { action: "startAuthSession"; session: MastroSessionPayload; receiverBaseUrl: string }
+type DepopMessage =
+  | { action: "startAuthSession"; session: DepopSessionPayload; receiverBaseUrl: string }
   | { action: "isSessionTab" }
   | { action: "getStatus" }
   | { action: "pageReady"; url: string }
-  | { action: "bridgeEvent"; detail: MastroBridgeEvent };
+  | { action: "bridgeEvent"; detail: DepopBridgeEvent };
 
 // -- browser proxy (run requests in an authenticated tab) -------------------
 
@@ -138,7 +138,7 @@ interface ProxyResponse {
 
 // -- page-bridge event payloads ---------------------------------------------
 
-type MastroBridgeEvent =
+type DepopBridgeEvent =
   | { type: "fetch-response"; url: string; status: number; bodyText: string }
   | { type: "xhr-response"; url: string; status: number; bodyText: string }
   | {

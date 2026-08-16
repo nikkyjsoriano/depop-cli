@@ -9,9 +9,9 @@
 (function () {
   const MAX_BODY = 64 * 1024; // never ship more than 64 KB of a response body
 
-  /** @param {MastroBridgeEvent} detail */
+  /** @param {DepopBridgeEvent} detail */
   function emit(detail) {
-    window.postMessage({ __mastro: "bridgeEvent", detail }, window.location.origin);
+    window.postMessage({ __depop: "bridgeEvent", detail }, window.location.origin);
   }
 
   /** @param {unknown} text @returns {string} */

@@ -1,7 +1,7 @@
 /**
  * Client-side rate limiting for replayed requests.
  *
- * A provider can declare `x-mastro-replay.rate_limit.requests_per_minute`. We
+ * A provider can declare `x-depop-replay.rate_limit.requests_per_minute`. We
  * honor it with a token bucket so a burst (e.g. a workflow `foreach` uploading
  * many photos, or rapid agent calls) is paced to the declared budget rather
  * than hammering the unofficial API — which is both an ethics expectation

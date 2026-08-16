@@ -1,25 +1,23 @@
 /**
- * mastro CLI router.
+ * depop CLI router.
  *
- *   mastro login <provider>      capture a browser session
- *   mastro logout <provider>     forget a stored session
- *   mastro status                show logged-in connectors
- *   mastro providers [...]       list / fetch / refresh connectors
- *   mastro skills [...]          install agent skills for connectors
- *   mastro extension [...]       install the browser extension
- *   mastro <provider> <command>  call a connector's unofficial API
+ *   depop login             capture a browser session
+ *   depop logout            forget the stored session
+ *   depop status            show whether the session is usable
+ *   depop skills [...]      install the agent skills
+ *   depop extension [...]   install the browser extension
+ *   depop <command>         call the Depop API (search, me, list, update)
  *
- * Built-in verbs are handled directly; anything else is treated as a provider
- * id and dispatched dynamically from that provider's OpenAPI operations.
+ * Built-in verbs are handled directly; anything else is looked up in
+ * `spec/openapi.yaml` and dispatched from that operation.
  */
 import { createContext } from "./context.ts";
 import { login } from "./commands/login.ts";
 import { logout } from "./commands/logout.ts";
 import { status } from "./commands/status.ts";
-import { providers } from "./commands/providers.ts";
 import { skills } from "./commands/skills.ts";
 import { extension } from "./commands/extension.ts";
-import { runConnector } from "./commands/connector.ts";
+import { printCommands, runCommand } from "./commands/call.ts";
 import { jsonMode, ui } from "./output.ts";
 import { VERSION } from "./version.ts";
 
@@ -28,33 +26,35 @@ export async function run(argv: string[]): Promise<number> {
   const args = argv.filter((a) => a !== "--json");
   const [command, ...rest] = args;
 
-  if (!command || command === "--help" || command === "-h") {
-    printHelp();
-    return command ? 0 : 1;
-  }
   if (command === "--version" || command === "-v") {
     console.log(VERSION);
     return 0;
   }
 
+  // `--help` needs the spec loaded to list the API commands, so it falls
+  // through to the context below rather than short-circuiting here.
   const ctx = createContext();
+
+  if (!command || command === "--help" || command === "-h") {
+    printHelp();
+    printCommands(ctx.definition);
+    return command ? 0 : 1;
+  }
 
   switch (command) {
     case "login":
-      return login(ctx, rest[0]);
+      return login(ctx);
     case "logout":
-      return logout(ctx, rest[0]);
+      return logout(ctx);
     case "status":
       return status(ctx, asJson);
-    case "providers":
-      return providers(ctx, rest, asJson);
     case "skills":
-      return skills(ctx, rest, asJson);
+      return skills(rest, asJson);
     case "extension":
-      return extension(ctx, rest, asJson);
+      return extension(rest, asJson);
     default:
-      // Treat `command` as a provider id: `mastro depop search ...`
-      return runConnector(ctx, command, rest, asJson);
+      // Treat `command` as an operation in the spec: `depop search ...`
+      return runCommand(ctx, command, rest, asJson);
   }
 }
 
@@ -68,7 +68,7 @@ export async function main(argv: string[]): Promise<number> {
 }
 
 /**
- * Map any thrown value to a clean message + exit code. Every mastro error type
+ * Map any thrown value to a clean message + exit code. Every depop error type
  * (UsageError, NotAuthenticatedError, BrokerError, …) already carries an
  * actionable message, so we print that and exit. An error may opt into a
  * non-default exit code by exposing a numeric `exitCode` (UsageError → 2);
@@ -87,25 +87,22 @@ function exitCodeOf(err: unknown): number {
 }
 
 function printHelp(): void {
-  ui.print(`mastro — unofficial connectors for web apps, for agents and humans.
+  ui.print(`depop — drive your logged-in Depop session from the terminal.
 
 Usage:
-  mastro login <provider>        Capture a browser session for a connector
-  mastro logout <provider>       Forget a stored session
-  mastro status                  Show logged-in connectors
-  mastro providers               List available connectors
-  mastro providers add <id>      Fetch a connector's latest definition from GitHub
-  mastro skills add <id>         Install a connector's agent skills (.claude/skills)
-  mastro extension install       Install the browser extension (needed for login)
-  mastro <provider> <command>    Call a connector's unofficial API
-  mastro <provider> --help       Show a connector's commands
+  depop login                   Capture your Depop session from the browser
+  depop logout                  Forget the stored session
+  depop status                  Show whether the session is usable
+  depop skills add              Install the agent skills (.claude/skills)
+  depop extension install       Install the browser extension (needed for login)
+  depop <command> --help        Show a command's flags
 
 Global flags:
   --json                         Machine-readable output (for agents)
   --version, -v                  Print version
 
 Examples:
-  mastro login depop
-  mastro depop search "carhartt jacket" --conditions used_good --sizes M
-  mastro skills add depop --global`);
+  depop login
+  depop search "carhartt jacket" --conditions used_good --sizes M
+  depop skills add --global`);
 }

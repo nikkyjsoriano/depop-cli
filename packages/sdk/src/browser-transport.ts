@@ -1,6 +1,6 @@
 /**
  * BrowserTransport — runs a request inside an authenticated browser tab via the
- * mastro extension, to get past Cloudflare-style managed challenges that TLS
+ * depop extension, to get past Cloudflare-style managed challenges that TLS
  * impersonation can't solve.
  *
  * It stands up a loopback ProxyServer, hands the request to the extension (which
@@ -9,7 +9,7 @@
  *
  * See docs/BROWSER-PROXY.md.
  */
-import { ProxyServer } from "@mastro/core";
+import { ProxyServer } from "@depop/core";
 
 import type { HttpRequest, HttpResponse, Transport } from "./transport.ts";
 

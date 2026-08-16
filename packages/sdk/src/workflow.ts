@@ -1,5 +1,5 @@
 /**
- * WorkflowRunner — executes an `x-mastro-workflow` (a multi-step flow declared
+ * WorkflowRunner — executes an `x-depop-workflow` (a multi-step flow declared
  * in the OpenAPI doc) for stateful operations like "upload pictures → poll →
  * create listing".
  *
@@ -14,18 +14,11 @@
  */
 import { readFileSync } from "node:fs";
 
-import type {
-  MastroWorkflow,
-  OpenApiSpec,
-  OperationView,
-  WorkflowFormReplay,
-  WorkflowStep,
-} from "@mastro/core";
+import type { DepopWorkflow, OpenApiSpec, OperationView, WorkflowStep } from "@depop/core";
 
-import { encodeForm, parseFormFields } from "./form.ts";
 import { renderDeep, renderTemplate, renderTemplateString, type TemplateContext } from "./template.ts";
 import { FetchTransport, type Transport } from "./transport.ts";
-import { getPath, metaRefreshUrl, parseMaybeJson, sleep } from "./util.ts";
+import { getPath, parseMaybeJson, sleep } from "./util.ts";
 
 export class WorkflowError extends Error {
   /**
@@ -88,8 +81,8 @@ export class WorkflowRunner {
 
   /** Run a workflow operation and return the configured result. */
   async run(op: OperationView, args: Record<string, unknown>): Promise<unknown> {
-    const workflow = op.operation["x-mastro-workflow"];
-    if (!workflow) throw new Error(`operation "${op.id}" has no x-mastro-workflow`);
+    const workflow = op.operation["x-depop-workflow"];
+    if (!workflow) throw new Error(`operation "${op.id}" has no x-depop-workflow`);
 
     /** Accumulated per-step results, exposed as ${steps.<id>}. */
     const steps: Record<string, unknown> = {};
@@ -194,9 +187,7 @@ export class WorkflowRunner {
       for (const [k, v] of Object.entries(req.headers)) headers[k] = renderTemplateString(v, c, this.opts());
     }
 
-    const built = req.form
-      ? { body: await this.buildFormBody(step, req.form, headers, c), changed: true }
-      : this.buildBody(req.body, headers, c, req.base);
+    const built = this.buildBody(req.body, headers, c, req.base);
     const body = built.body;
 
     // Every field of an edit is optional, so "no flags passed" and "flags that
@@ -221,32 +212,19 @@ export class WorkflowRunner {
     }
 
     const transport = req.transport === "direct" || req.no_auth ? this.direct : await this.deps.apiTransport();
-    let res = await transport.send({ method, url, headers, body });
-    let text = await res.text();
-
-    // Follow an Akamai-style meta-refresh bot wall, same as a single call()
-    // (see connector.request) — a workflow GET can hit the stub interstitial
-    // too. GET, same headers, at most two hops.
-    if (this.deps.spec.replay().follow_html_refresh) {
-      for (let hop = 0; hop < 2; hop++) {
-        const target = metaRefreshUrl(text);
-        if (!target) break;
-        const next = new URL(target, url).toString();
-        res = await transport.send({ method: "GET", url: next, headers });
-        text = await res.text();
-      }
-    }
+    const res = await transport.send({ method, url, headers, body });
+    const text = await res.text();
 
     if (res.status < 200 || res.status >= 300) {
-      if (process.env.MASTRO_DEBUG_STEPS) {
-        console.error(`[mastro-debug] step "${step.id}" ERROR ${res.status} body:`, text.slice(0, 1500));
+      if (process.env.DEPOP_DEBUG_STEPS) {
+        console.error(`[depop-debug] step "${step.id}" ERROR ${res.status} body:`, text.slice(0, 1500));
       }
       throw new WorkflowError(step.id, `HTTP ${res.status}: ${text.slice(0, 500)}`);
     }
 
     const data = parseMaybeJson(text);
-    if (process.env.MASTRO_DEBUG_STEPS) {
-      console.error(`[mastro-debug] step "${step.id}" raw response:`, JSON.stringify(data).slice(0, 600));
+    if (process.env.DEPOP_DEBUG_STEPS) {
+      console.error(`[depop-debug] step "${step.id}" raw response:`, JSON.stringify(data).slice(0, 600));
     }
     // Return the RAW response; `output` extraction happens in executeOnce after
     // any poll loop, so `poll.until` can reference the full response body.
@@ -306,37 +284,6 @@ export class WorkflowRunner {
     return { body: json, changed: !isEmptyBody(json) };
   }
 
-  /**
-   * Build an application/x-www-form-urlencoded body by replaying a server-
-   * rendered <form> from a prior step's HTML (x-mastro-form). Captures the
-   * form's CSRF token and hidden fields verbatim, then applies the templated
-   * `set`/`unset` overrides (the clicked button, a JS-set flag). Under dry-run
-   * the HTML is a step stub, so there's no real form to parse — emit a
-   * placeholder body instead of failing.
-   */
-  private async buildFormBody(
-    step: WorkflowStep,
-    form: WorkflowFormReplay,
-    headers: Record<string, string>,
-    ctx: TemplateContext,
-  ): Promise<string> {
-    headers["content-type"] ??= "application/x-www-form-urlencoded";
-
-    const set: Record<string, string> = {};
-    for (const [k, v] of Object.entries(form.set ?? {})) set[k] = renderTemplateString(v, ctx, this.opts());
-
-    if (this.deps.dryRun) {
-      // `${steps.*}` is a stub in dry-run; the real form fields are unknown.
-      return encodeForm([{ name: "<form-fields>", value: "<from " + (form.selector ?? "form") + ">" }], set, form.unset);
-    }
-
-    const html = renderTemplateString(form.html, ctx, { strict: false });
-    const fields = await parseFormFields(html, form.selector);
-    if (!fields) {
-      throw new WorkflowError(step.id, `x-mastro-form: no form matched "${form.selector ?? "form"}"`);
-    }
-    return encodeForm(fields, set, form.unset);
-  }
 
   /** Extract this step's stored result per its `output` config. */
   private applyOutput(step: WorkflowStep, data: unknown): unknown {

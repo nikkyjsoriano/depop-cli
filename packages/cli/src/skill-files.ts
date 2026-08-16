@@ -2,11 +2,10 @@
  * Reading and installing agent skills.
  *
  * A skill is a directory containing a SKILL.md with YAML frontmatter
- * (`name`, `description`). Provider skills live in `providers/<id>/skills/`;
- * the root `mastro` skill lives in the package's `skills/` directory.
+ * (`name`, `description`), shipped under the package's `skills/` directory.
  * Installing copies the directory into an agent skills folder (`.claude/skills`
- * by default) under the skill's frontmatter name, plus a `.mastro.json`
- * provenance sidecar so `mastro skills update` can refresh it later.
+ * by default) under the skill's frontmatter name, plus a `.depop.json`
+ * provenance sidecar so `depop skills update` can refresh it later.
  */
 import { cpSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -16,7 +15,7 @@ import { UsageError } from "./args.ts";
 import { VERSION } from "./version.ts";
 
 export interface SkillInfo {
-  /** "depop/search" for provider skills, "mastro" for the root skill. */
+  /** The bundled directory name, e.g. "search" — how `add`/`update` name it. */
   source: string;
   /** Frontmatter `name` — also the installed directory name. */
   name: string;
@@ -32,11 +31,11 @@ export interface SkillProvenance {
   installed_at: string;
 }
 
-const SIDECAR = ".mastro.json";
+const SIDECAR = ".depop.json";
 
 /**
  * Parse the `name:` and `description:` lines out of SKILL.md frontmatter.
- * Mastro skill frontmatter is deliberately flat single-line YAML, so a full
+ * Skill frontmatter here is deliberately flat single-line YAML, so a full
  * YAML parser isn't needed.
  */
 export function readSkill(dir: string, source: string): SkillInfo {
@@ -58,15 +57,14 @@ export function readSkill(dir: string, source: string): SkillInfo {
   return { source, name, description, dir };
 }
 
-/** All skills shipped by one provider directory (empty if it has none). */
-export function providerSkills(providerId: string, providerDir: string): SkillInfo[] {
-  const root = join(providerDir, "skills");
+/** Every skill bundled under `root` (a package's `skills/` directory). */
+export function bundledSkills(root: string): SkillInfo[] {
   if (!existsSync(root)) return [];
   const out: SkillInfo[] = [];
   for (const entry of readdirSync(root).sort()) {
     const dir = join(root, entry);
     if (statSync(dir).isDirectory() && existsSync(join(dir, "SKILL.md"))) {
-      out.push(readSkill(dir, `${providerId}/${entry}`));
+      out.push(readSkill(dir, entry));
     }
   }
   return out;
@@ -99,7 +97,7 @@ export function installSkill(skill: SkillInfo, target: string): string {
   return dest;
 }
 
-/** Installed mastro-managed skills under `target` (dirs carrying a sidecar). */
+/** Installed depop-managed skills under `target` (dirs carrying a sidecar). */
 export function installedSkills(target: string): Array<{ dir: string; provenance: SkillProvenance }> {
   if (!existsSync(target)) return [];
   const out: Array<{ dir: string; provenance: SkillProvenance }> = [];

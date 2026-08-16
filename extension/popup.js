@@ -1,6 +1,6 @@
 /**
  * Popup UI — polls the background worker for capture status and renders it.
- * Read-only: it never triggers a capture (that's `mastro login` from the CLI).
+ * Read-only: it never triggers a capture (that's `depop login` from the CLI).
  */
 const dot = /** @type {HTMLElement} */ (document.getElementById("dot"));
 const stateEl = /** @type {HTMLElement} */ (document.getElementById("state"));
@@ -30,7 +30,7 @@ function render(/** @type {any} */ status) {
       : `Capture failed (${last.displayName})`;
     const when = relativeTime(last.at);
     detailEl.textContent = last.ok
-      ? `Sent ${last.fields.join(", ")} to mastro · ${when}.`
+      ? `Sent ${last.fields.join(", ")} to the depop CLI · ${when}.`
       : `${last.message} · ${when}.`;
     return;
   }
