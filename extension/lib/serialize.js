@@ -13,7 +13,7 @@
  */
 /**
  * @param {Record<string, string>} fields
- * @param {MastroState} state
+ * @param {DepopState} state
  * @returns {Record<string, unknown>}
  */
 export function renderFields(fields, state) {
@@ -30,7 +30,7 @@ const PART = /\$\{([^}]+)\}/g;
 
 /**
  * @param {string} template
- * @param {MastroState} state
+ * @param {DepopState} state
  * @returns {unknown}
  */
 function renderValue(template, state) {
@@ -47,7 +47,7 @@ function renderValue(template, state) {
 
 /**
  * @param {string} expr
- * @param {MastroState} state
+ * @param {DepopState} state
  * @returns {unknown}
  */
 function resolve(expr, state) {

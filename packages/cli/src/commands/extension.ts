@@ -1,9 +1,9 @@
 /**
- * `mastro extension` — set up the browser extension outside the repo.
+ * `depop extension` — set up the browser extension outside the repo.
  *
- * `mastro login` needs the mastro extension running in the user's Chrome to
+ * `depop login` needs this extension running in the user's Chrome to
  * capture a session. The extension ships inside the npm package; `install`
- * copies it to a stable path (~/.mastro/extension) and prints the
+ * copies it to a stable path (~/.depop/extension) and prints the
  * load-unpacked steps, so npx users aren't stranded at first login.
  *
  * Chrome offers no CLI to load an unpacked extension into a running profile —
@@ -16,11 +16,11 @@ import { cpSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { UsageError } from "../args.ts";
-import { packageRoot, type CliContext } from "../context.ts";
+import { packageRoot } from "../context.ts";
 import { emit, ui } from "../output.ts";
-import { mastroHome } from "@mastro/core";
+import { depopHome } from "@depop/core";
 
-export function extension(_ctx: CliContext, rest: string[], asJson: boolean): number {
+export function extension(rest: string[], asJson: boolean): number {
   const [sub, ...flags] = rest;
   switch (sub) {
     case "install":
@@ -38,13 +38,13 @@ export function extension(_ctx: CliContext, rest: string[], asJson: boolean): nu
 }
 
 function installedDir(): string {
-  return join(mastroHome(), "extension");
+  return join(depopHome(), "extension");
 }
 
 function install(asJson: boolean, open: boolean): number {
   const source = join(packageRoot(), "extension");
   if (!existsSync(join(source, "manifest.json"))) {
-    throw new Error("this mastro install does not bundle the extension — reinstall the package.");
+    throw new Error("this depop install does not bundle the extension — reinstall the package.");
   }
   const dest = installedDir();
   cpSync(source, dest, { recursive: true });
@@ -70,8 +70,8 @@ Load it in Chrome (one time):
   2. Toggle "Developer mode" (top right)
   3. ${pickStep}
 
-Then run \`mastro login <provider>\`. After a mastro update, re-run
-\`mastro extension install\` and hit ↻ on the extension card.`);
+Then run \`depop login\`. After a depop update, re-run
+\`depop extension install\` and hit ↻ on the extension card.`);
   return 0;
 }
 
@@ -144,17 +144,17 @@ function path(asJson: boolean): number {
     return 0;
   }
   console.log(dest);
-  if (!installed) ui.warn("not installed yet — run `mastro extension install`");
+  if (!installed) ui.warn("not installed yet — run `depop extension install`");
   return 0;
 }
 
 function printHelp(): void {
-  ui.print(`mastro extension — install the browser extension mastro login needs.
+  ui.print(`depop extension — install the browser extension depop login needs.
 
 Usage:
-  mastro extension install    Copy the bundled extension to ~/.mastro/extension,
+  depop extension install    Copy the bundled extension to ~/.depop/extension,
                               copy that path to the clipboard, and open
                               chrome://extensions ready for "Load unpacked".
     --no-open                 Skip opening chrome://extensions.
-  mastro extension path       Print where it lives (and whether it's installed)`);
+  depop extension path       Print where it lives (and whether it's installed)`);
 }

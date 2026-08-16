@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://mastro-connect.dev/schemas/browser-auth-manifest/v1",
+  "$id": "https://github.com/nikkyjsoriano/depop-cli/schemas/browser-auth-manifest/v1",
   "title": "Browser Auth Manifest",
   "type": "object",
   "additionalProperties": false,

@@ -2,7 +2,7 @@
  * Drift guard for the extension's hand-maintained type mirror.
  *
  * `extension/types.d.ts` re-declares the manifest shape as ambient types so the
- * plain-JS extension can be checkJs-verified without importing @mastro/core.
+ * plain-JS extension can be checkJs-verified without importing @depop/core.
  * Nothing fails at build time when the canonical contract changes and the mirror
  * doesn't — they just silently diverge until a capture breaks at runtime.
  *

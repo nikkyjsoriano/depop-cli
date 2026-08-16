@@ -1,5 +1,5 @@
 /**
- * mastro background service worker — the generic capture runtime.
+ * depop background service worker — the generic capture runtime.
  *
  * It interprets a provider's auth.manifest.json declaratively: no per-provider
  * code. One session at a time. Observations from cookies / webRequest headers /
@@ -16,15 +16,15 @@ import { renderFields } from "./lib/serialize.js";
 import { extractCookies } from "./lib/cookies.js";
 import { startProxyLoop } from "./lib/proxy.js";
 
-// Long-poll the mastro browser-proxy server so `mastro <provider> <cmd>` can run
-// requests through an authenticated tab (past Cloudflare). No-ops when no mastro
+// Long-poll the browser-proxy server so `depop <cmd>` can run
+// requests through an authenticated tab (past Cloudflare). No-ops when no depop
 // command is running (the server simply isn't up).
 startProxyLoop();
 
-// Session/state shapes live in types.d.ts (MastroSession, MastroState, …),
-// mirroring the @mastro/core contracts.
+// Session/state shapes live in types.d.ts (DepopSession, DepopState, …),
+// mirroring the @depop/core contracts.
 
-/** @type {MastroSession | null} */
+/** @type {DepopSession | null} */
 let session = null;
 
 /**
@@ -48,7 +48,7 @@ function buildStatus() {
  * Narrow the module-level `session` to a non-null, matching active session for
  * a given tab. Returns null if there's no active session or the tab is unrelated.
  * @param {number | undefined} tabId
- * @returns {MastroSession | null}
+ * @returns {DepopSession | null}
  */
 function activeSessionForTab(tabId) {
   if (!session || session.submitted) return null;
@@ -59,7 +59,7 @@ function activeSessionForTab(tabId) {
 
 chrome.runtime.onMessage.addListener(
   /**
-   * @param {MastroMessage} msg
+   * @param {DepopMessage} msg
    * @param {chrome.runtime.MessageSender} sender
    * @param {(response: unknown) => void} sendResponse
    */
@@ -102,7 +102,7 @@ chrome.runtime.onMessage.addListener(
 // -- session lifecycle ------------------------------------------------------
 
 /**
- * @param {MastroSessionPayload} payload
+ * @param {DepopSessionPayload} payload
  * @param {string} receiverBaseUrl
  * @param {number | undefined} bootstrapTabId
  */
@@ -163,7 +163,7 @@ chrome.webRequest.onHeadersReceived.addListener(
 );
 
 /**
- * @param {MastroSession} s
+ * @param {DepopSession} s
  * @param {"request" | "response"} source
  * @param {string} url
  * @param {chrome.webRequest.HttpHeader[]} headers
@@ -190,8 +190,8 @@ function applyHeaderRules(s, source, url, headers) {
 // -- page-bridge events -----------------------------------------------------
 
 /**
- * @param {MastroSession} s
- * @param {MastroBridgeEvent} detail
+ * @param {DepopSession} s
+ * @param {DepopBridgeEvent} detail
  */
 function applyPageEvent(s, detail) {
   if (!detail) return;
@@ -252,7 +252,7 @@ async function maybeComplete() {
 /**
  * Remember the outcome so the popup can show it after the session is cleared.
  * Records only which credential fields were captured — never their values.
- * @param {MastroSession} s
+ * @param {DepopSession} s
  * @param {{ credentials: Record<string, unknown> }} bundle
  * @param {boolean} ok
  */
@@ -263,23 +263,23 @@ function recordResult(s, bundle, ok) {
     ok,
     fields: Object.keys(bundle.credentials),
     at: Date.now(),
-    message: ok ? "captured and sent to mastro" : "failed to post capture to mastro",
+    message: ok ? "captured and sent to depop" : "failed to post capture to depop",
   };
 }
 
-/** @param {MastroSession} s */
+/** @param {DepopSession} s */
 async function refreshCookies(s) {
   for (const rule of s.manifest.capture.cookies ?? []) {
     const url = rule.url === "$launch.url" ? s.launchUrl : rule.url;
     const cookies = await extractCookies(url, rule.include_names_matching);
     const bucket = rule.save_as ?? "cookies";
-    const existing = /** @type {Record<string, MastroCookie>} */ (s.state[bucket] ?? {});
+    const existing = /** @type {Record<string, DepopCookie>} */ (s.state[bucket] ?? {});
     s.state[bucket] = { ...existing, ...cookies };
   }
 }
 
 /**
- * @param {MastroSession} s
+ * @param {DepopSession} s
  * @returns {{ credentials: Record<string, unknown> } & Record<string, unknown>} a capture bundle (capture-bundle/v1)
  */
 function serialize(s) {
@@ -301,7 +301,7 @@ function serialize(s) {
 }
 
 /**
- * @param {MastroSession} s
+ * @param {DepopSession} s
  * @param {object} bundle
  * @returns {Promise<boolean>}
  */
@@ -337,7 +337,7 @@ async function reportStatus(status, message = "") {
   }
 }
 
-/** @param {MastroSession} s */
+/** @param {DepopSession} s */
 function closeTabs(s) {
   const ids = [s.appTabId, s.bootstrapTabId].filter(
     /** @returns {id is number} */ (id) => id != null,

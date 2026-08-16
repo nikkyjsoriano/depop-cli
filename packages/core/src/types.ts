@@ -1,5 +1,5 @@
 /**
- * The data contracts of mastro-connect.
+ * The data contracts of depop-cli.
  *
  * These cover the browser-capture half of a connector:
  *   1. AuthManifest         — what the extension should capture and when it's done.
@@ -7,7 +7,7 @@
  *   3. PersistedCredential  — the minimal record the broker stores.
  *
  * The API-replay half is described by the provider's OpenAPI 3.1 document (with
- * `x-mastro-*` extensions); see `openapi.ts`. Everything here is declarative so
+ * `x-depop-*` extensions); see `openapi.ts`. Everything here is declarative so
  * a provider is "data, not code".
  *
  * The AuthManifest shape lives in THREE places that must stay in lockstep:
@@ -156,7 +156,7 @@ export interface CaptureBundle {
   captured_at: number;
   /** Unix seconds. Optional; provider may not know token lifetime. */
   expires_at?: number;
-  /** The serialized credential fields the OpenAPI x-mastro-auth will consume. */
+  /** The serialized credential fields the OpenAPI x-depop-auth will consume. */
   credentials: Record<string, unknown>;
   browser_context?: {
     user_agent?: string;
@@ -176,7 +176,7 @@ export interface PersistedCredential {
   provider_id: string;
   captured_at: number;
   expires_at?: number;
-  /** The credential fields, ready to feed into OpenAPI x-mastro-auth templates. */
+  /** The credential fields, ready to feed into OpenAPI x-depop-auth templates. */
   fields: Record<string, unknown>;
   browser_context?: CaptureBundle["browser_context"];
   validation?: ValidationResult;

@@ -37,7 +37,7 @@ interface Pending {
 
 /**
  * Fixed loopback port so the extension always knows where to poll (a random
- * port would change every run). Override with MASTRO_PROXY_PORT.
+ * port would change every run). Override with DEPOP_PROXY_PORT.
  */
 export const DEFAULT_PROXY_PORT = 7878;
 
@@ -63,7 +63,7 @@ export class ProxyServer {
     } catch (err) {
       throw new Error(
         `could not bind the browser-proxy port ${this.port}. ` +
-          `Another mastro command may be running, or set MASTRO_PROXY_PORT.\n${
+          `Another depop command may be running, or set DEPOP_PROXY_PORT.\n${
             err instanceof Error ? err.message : String(err)
           }`,
       );
@@ -177,7 +177,7 @@ export class ProxyServer {
 // -- helpers ----------------------------------------------------------------
 
 function proxyPort(): number {
-  const env = process.env.MASTRO_PROXY_PORT;
+  const env = process.env.DEPOP_PROXY_PORT;
   const parsed = env ? Number(env) : NaN;
   return Number.isInteger(parsed) ? parsed : DEFAULT_PROXY_PORT;
 }

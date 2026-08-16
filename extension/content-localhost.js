@@ -1,5 +1,5 @@
 /**
- * Runs on the mastro bootstrap page (127.0.0.1 / localhost).
+ * Runs on the depop bootstrap page (127.0.0.1 / localhost).
  *
  * Reads the inert session payload the receiver embedded, tells the page the
  * extension is present (so it doesn't show install instructions), and hands the
@@ -7,7 +7,7 @@
  */
 (function () {
   function readPayload() {
-    const tag = document.getElementById("mastro-session");
+    const tag = document.getElementById("depop-session");
     if (!tag) return null;
     try {
       return JSON.parse(tag.textContent || "");
@@ -19,7 +19,7 @@
   function announcePresence() {
     // Inject a tiny page-context flag the bootstrap page checks.
     const s = document.createElement("script");
-    s.textContent = "window.__mastroExtensionPresent = true;";
+    s.textContent = "window.__depopExtensionPresent = true;";
     (document.head || document.documentElement).appendChild(s);
     s.remove();
   }

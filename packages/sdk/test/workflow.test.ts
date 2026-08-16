@@ -4,7 +4,7 @@
  */
 import { expect, test } from "bun:test";
 
-import { OpenApiSpec, type OpenApiDocument } from "@mastro/core";
+import { OpenApiSpec, type OpenApiDocument } from "@depop/core";
 import { MissingTemplateValue, Resolver, JsonCache, WorkflowRunner } from "../src/index.ts";
 
 /** A one-step workflow whose create body is supplied by the caller (for strict tests). */
@@ -17,18 +17,18 @@ function bodySpec(body: unknown): OpenApiSpec {
       "/x/flow": {
         post: {
           operationId: "flow",
-          "x-mastro-command": "flow",
-          "x-mastro-workflow": {
+          "x-depop-command": "flow",
+          "x-depop-workflow": {
             steps: [
               { id: "upload", operationId: "up", output: { path: "url" } },
               { id: "create", operationId: "create", request: { body } },
             ],
           },
-          "x-mastro-args": [{ name: "title", required: true }],
+          "x-depop-args": [{ name: "title", required: true }],
         },
       },
-      "/up": { post: { operationId: "up", "x-mastro-hidden": true } },
-      "/create": { post: { operationId: "create", "x-mastro-hidden": true } },
+      "/up": { post: { operationId: "up", "x-depop-hidden": true } },
+      "/create": { post: { operationId: "create", "x-depop-hidden": true } },
     },
   };
   return new OpenApiSpec(doc);
@@ -51,24 +51,24 @@ function workflowSpec(): OpenApiSpec {
     openapi: "3.1.0",
     info: { title: "wf", version: "1" },
     servers: [{ url: "https://api.example.com" }],
-    "x-mastro-auth": { headers: { authorization: "Bearer ${auth.token}" } },
+    "x-depop-auth": { headers: { authorization: "Bearer ${auth.token}" } },
     paths: {
       "/x/flow": {
         post: {
           operationId: "flow",
-          "x-mastro-command": "flow",
-          "x-mastro-workflow": {
+          "x-depop-command": "flow",
+          "x-depop-workflow": {
             result: "create",
             steps: [
               { id: "slots", operationId: "slot", foreach: "${args.photo}", as: "photo", output: { path: "url" } },
               { id: "create", operationId: "create", request: { body: { ids: "${steps.slots}", uid: "${uuid}" } } },
             ],
           },
-          "x-mastro-args": [{ name: "photo", required: true, multiple: true }],
+          "x-depop-args": [{ name: "photo", required: true, multiple: true }],
         },
       },
-      "/slot": { post: { operationId: "slot", "x-mastro-hidden": true } },
-      "/create": { post: { operationId: "create", "x-mastro-hidden": true } },
+      "/slot": { post: { operationId: "slot", "x-depop-hidden": true } },
+      "/create": { post: { operationId: "create", "x-depop-hidden": true } },
     },
   };
   return new OpenApiSpec(doc);
@@ -148,7 +148,7 @@ test("non-dry-run returns the named result step's response", async () => {
 });
 
 test("file-backed keyed resolver with key_template derives a value from other args", async () => {
-  const cache = new JsonCache("wf-test", `/tmp/mastro-wf-${process.pid}`);
+  const cache = new JsonCache(`/tmp/depop-wf-${process.pid}`);
   const resolver = new Resolver(cache, async () => ({}), (rel) => {
     expect(rel).toBe("reference/categories.json");
     return { "menswear/tshirts": { size_set_us: 54 }, "womenswear/dresses": { size_set_us: 84 } };

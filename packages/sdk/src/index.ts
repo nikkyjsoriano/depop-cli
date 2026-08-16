@@ -1,4 +1,4 @@
-/** Public surface of @mastro/sdk. */
+/** Public surface of @depop/sdk. */
 export {
   Connector,
   NotAuthenticatedError,
@@ -8,8 +8,6 @@ export {
 } from "./connector.ts";
 export {
   FetchTransport,
-  CurlImpersonateTransport,
-  selectTransport,
   type Transport,
   type HttpRequest,
   type HttpResponse,
@@ -23,9 +21,6 @@ export {
   MissingTemplateValue,
   type TemplateContext,
 } from "./template.ts";
-export { extractItems, type ExtractedItem } from "./extract.ts";
-export { extractFlight } from "./flight.ts";
-export { parseFormFields, encodeForm, type FormField } from "./form.ts";
 export { Resolver, extractPath, type TaxonomyEntry, type MetadataFetcher } from "./resolver.ts";
 export { JsonCache } from "./cache.ts";
 export { TokenBucket, throttled } from "./throttle.ts";

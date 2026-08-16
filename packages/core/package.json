@@ -1,8 +1,8 @@
 {
-  "name": "@mastro/core",
+  "name": "@depop/core",
   "version": "0.1.0",
   "type": "module",
-  "description": "Schemas, types, credential store, broker and receiver for mastro-connect.",
+  "description": "Schemas, types, credential store, broker and receiver for depop-cli.",
   "license": "MIT",
   "exports": {
     ".": "./src/index.ts",

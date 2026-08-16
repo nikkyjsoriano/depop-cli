@@ -7,7 +7,7 @@ dist/
 *.tsbuildinfo
 
 # local credentials & captures (NEVER commit)
-.mastro/
+.depop/
 auth/
 *.har
 *.redacted.har.tmp

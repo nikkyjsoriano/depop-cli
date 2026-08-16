@@ -1,11 +1,11 @@
 /**
  * Tiny TTL'd JSON cache for fetched taxonomy data (sizes, brands, categories).
- * One file per (provider, key) under ~/.mastro/cache/<provider>/<key>.json.
+ * One file per key under ~/.depop/cache/<key>.json.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { mastroHome, unixNow } from "@mastro/core";
+import { depopHome, unixNow } from "@depop/core";
 
 interface CacheEnvelope<T> {
   stored_at: number;
@@ -16,8 +16,8 @@ interface CacheEnvelope<T> {
 export class JsonCache {
   private readonly dir: string;
 
-  constructor(providerId: string, root: string = mastroHome()) {
-    this.dir = join(root, "cache", providerId);
+  constructor(root: string = depopHome()) {
+    this.dir = join(root, "cache");
   }
 
   /** Return the cached value if present and not expired, else undefined. */

@@ -36,7 +36,7 @@
     window.addEventListener("message", function (event) {
       if (event.source !== window) return;
       const data = event.data;
-      if (!data || data.__mastro !== "bridgeEvent") return;
+      if (!data || data.__depop !== "bridgeEvent") return;
       chrome.runtime.sendMessage(
         { action: "bridgeEvent", detail: data.detail },
         function () {

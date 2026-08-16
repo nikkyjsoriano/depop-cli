@@ -1,5 +1,5 @@
 /**
- * Template resolution for x-mastro-* strings.
+ * Template resolution for x-depop-* strings.
  *
  * Profiles use `${scope.path}` placeholders that resolve against a context,
  * typically `{ auth: <credential fields>, args: <cli args> }`. A string that is
@@ -51,18 +51,13 @@ export function renderTemplate(
     // resolved to nothing must not be sent as an empty string.
     const { expr: optExpr, optional } = splitOptional(whole[1]!.trim());
     let expr = optExpr;
-    // A leading `<mod>:` selects a value transform. `num:` casts to a JS number
-    // (a body field serializes as a JSON number, not a string — Depop wants
-    // numeric lat/lng, address id, variant_set). `unquote:` strips one layer of
-    // surrounding double-quotes from a string (LinkedIn stores JSESSIONID as
-    // `"ajax:123"` but its csrf-token header wants the bare `ajax:123`).
-    let cast: "number" | "unquote" | undefined;
+    // A leading `num:` casts to a JS number, so a body field serializes as a
+    // JSON number rather than a string — Depop wants numeric lat/lng, address
+    // id and variant_set.
+    let cast: "number" | undefined;
     if (expr.startsWith("num:")) {
       cast = "number";
       expr = expr.slice(4).trim();
-    } else if (expr.startsWith("unquote:")) {
-      cast = "unquote";
-      expr = expr.slice(8).trim();
     }
     const value = lookup(expr, ctx);
     if (optional && isAbsent(value)) return undefined;
@@ -70,9 +65,6 @@ export function renderTemplate(
     if (cast === "number" && value != null && value !== "") {
       const n = Number(value);
       if (!Number.isNaN(n)) return n;
-    }
-    if (cast === "unquote" && typeof value === "string") {
-      return value.replace(/^"(.*)"$/s, "$1");
     }
     return value;
   }

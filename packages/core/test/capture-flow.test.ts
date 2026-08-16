@@ -7,18 +7,17 @@ import { afterEach, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
 
-import { AuthBroker, FileStore, ProviderRegistry, Receiver } from "../src/index.ts";
+import { AuthBroker, FileStore, loadDefinition, Receiver } from "../src/index.ts";
 
-const PROVIDERS_ROOT = join(import.meta.dir, "../../../providers");
-const TMP = `/tmp/mastro-capture-test-${process.pid}`;
+const SPEC_DIR = join(import.meta.dir, "../../../spec");
+const TMP = `/tmp/depop-capture-test-${process.pid}`;
 
 afterEach(() => rmSync(TMP, { recursive: true, force: true }));
 
 test("broker captures, validates, and persists a Depop credential", async () => {
-  const registry = new ProviderRegistry([PROVIDERS_ROOT]);
   const store = new FileStore(TMP);
   const broker = new AuthBroker(store);
-  const depop = registry.load("depop");
+  const depop = loadDefinition(SPEC_DIR);
 
   // Simulate the extension as soon as the bootstrap URL is live.
   const capturePromise = broker.capture(depop, {
@@ -28,7 +27,7 @@ test("broker captures, validates, and persists a Depop credential", async () => 
 
       // 1. Bootstrap page renders with the embedded session payload.
       const page = await fetch(url).then((r) => r.text());
-      expect(page).toContain("mastro-session");
+      expect(page).toContain("depop-session");
       expect(page).toContain("Depop");
 
       // 2. Extension posts the capture bundle (cookies → serialized fields).
@@ -51,14 +50,13 @@ test("broker captures, validates, and persists a Depop credential", async () => 
   const credential = await capturePromise;
   expect(credential.fields.access_token).toBe("tok-123");
   expect(credential.fields.user_id).toBe("42");
-  expect(store.get("depop")?.fields.user_id).toBe("42");
+  expect(store.get()?.fields.user_id).toBe("42");
 });
 
 test("broker rejects a capture missing api-profile required fields", async () => {
-  const registry = new ProviderRegistry([PROVIDERS_ROOT]);
   const store = new FileStore(TMP);
   const broker = new AuthBroker(store);
-  const depop = registry.load("depop");
+  const depop = loadDefinition(SPEC_DIR);
 
   const promise = broker.capture(depop, {
     onBootstrapUrl: async (url) => {
@@ -97,10 +95,9 @@ function simulateCapture(url: string, credentials: Record<string, unknown>): Pro
 }
 
 test("verify probe success is recorded on the credential", async () => {
-  const registry = new ProviderRegistry([PROVIDERS_ROOT]);
   const store = new FileStore(TMP);
   const broker = new AuthBroker(store);
-  const depop = registry.load("depop"); // spec declares x-mastro-auth.verify
+  const depop = loadDefinition(SPEC_DIR); // spec declares x-depop-auth.verify
 
   let probed = false;
   const credential = await broker.capture(
@@ -116,14 +113,13 @@ test("verify probe success is recorded on the credential", async () => {
 
   expect(probed).toBe(true);
   expect(credential.validation).toEqual({ ok: true, checked_at: 123 });
-  expect(store.get("depop")?.validation?.ok).toBe(true);
+  expect(store.get()?.validation?.ok).toBe(true);
 });
 
 test("a failed verify probe rejects login but persists the failure for status", async () => {
-  const registry = new ProviderRegistry([PROVIDERS_ROOT]);
   const store = new FileStore(TMP);
   const broker = new AuthBroker(store);
-  const depop = registry.load("depop");
+  const depop = loadDefinition(SPEC_DIR);
 
   const promise = broker.capture(
     depop,
@@ -132,17 +128,16 @@ test("a failed verify probe rejects login but persists the failure for status", 
   );
 
   await expect(promise).rejects.toThrow(/test call failed.*HTTP 401/s);
-  // The failed result is still stored, so `mastro status` can show it.
-  expect(store.get("depop")?.validation).toEqual({ ok: false, checked_at: 1, detail: "HTTP 401" });
+  // The failed result is still stored, so `depop status` can show it.
+  expect(store.get()?.validation).toEqual({ ok: false, checked_at: 1, detail: "HTTP 401" });
 });
 
 test("receiver rejects a capture from a disallowed origin", async () => {
-  const registry = new ProviderRegistry([PROVIDERS_ROOT]);
-  const depop = registry.load("depop");
+  const depop = loadDefinition(SPEC_DIR);
 
   // Drive the receiver directly so we don't depend on the broker's long timeout.
   const receiver = new Receiver({
-    providerId: depop.id,
+    providerId: depop.manifest.provider_id,
     displayName: depop.manifest.display_name,
     launchUrl: depop.manifest.launch.url,
     manifest: depop.manifest,
@@ -163,10 +158,9 @@ test("receiver rejects a capture from a disallowed origin", async () => {
 });
 
 test("receiver accepts a capture from the extension's chrome-extension:// origin", async () => {
-  const registry = new ProviderRegistry([PROVIDERS_ROOT]);
-  const depop = registry.load("depop");
+  const depop = loadDefinition(SPEC_DIR);
   const receiver = new Receiver({
-    providerId: depop.id,
+    providerId: depop.manifest.provider_id,
     displayName: depop.manifest.display_name,
     launchUrl: depop.manifest.launch.url,
     manifest: depop.manifest,

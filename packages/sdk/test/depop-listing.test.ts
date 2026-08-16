@@ -15,11 +15,11 @@ import { join } from "node:path";
 
 import { expect, test } from "bun:test";
 
-import { parseOpenApi, type OpenApiSpec } from "@mastro/core";
+import { parseOpenApi, type OpenApiSpec } from "@depop/core";
 import { WorkflowRunner } from "../src/index.ts";
 
-const SPEC_PATH = join(import.meta.dir, "../../../providers/depop/openapi.yaml");
-const PROVIDER_DIR = join(import.meta.dir, "../../../providers/depop");
+const SPEC_DIR = join(import.meta.dir, "../../../spec");
+const SPEC_PATH = join(SPEC_DIR, "openapi.yaml");
 
 interface PlannedStep {
   step: string;
@@ -32,8 +32,8 @@ function depopSpec(): OpenApiSpec {
   return parseOpenApi(readFileSync(SPEC_PATH, "utf8"));
 }
 
-function loadProviderFile(rel: string): unknown {
-  return JSON.parse(readFileSync(join(PROVIDER_DIR, rel), "utf8"));
+function loadSpecFile(rel: string): unknown {
+  return JSON.parse(readFileSync(join(SPEC_DIR, rel), "utf8"));
 }
 
 /**
@@ -87,7 +87,7 @@ const CURRENT_LISTING = {
 };
 
 /** What the country-derived location fields must come out as, for US. */
-const US_GEO = (loadProviderFile("reference/country_geo.json") as Record<string, Record<string, unknown>>)
+const US_GEO = (loadSpecFile("reference/country_geo.json") as Record<string, Record<string, unknown>>)
   .US as { address: string; geoLat: number; geoLng: number };
 
 /**
@@ -105,7 +105,7 @@ async function plan(command: string, args: Record<string, unknown>): Promise<Pla
     apiTransport: async () => {
       throw new Error("dry run must not send");
     },
-    loadFile: loadProviderFile,
+    loadFile: loadSpecFile,
     dryRun: true,
   });
   const op = spec.byCommand(command)!;
@@ -127,7 +127,7 @@ async function runUpdate(args: Record<string, unknown>): Promise<
     spec,
     authHeaders: () => ({ authorization: "Bearer tok" }),
     baseContext: () => ({ auth: { access_token: "tok" }, uuid: () => "fixed-uuid" }),
-    loadFile: loadProviderFile,
+    loadFile: loadSpecFile,
     apiTransport: async () => ({
       name: "mock",
       send: async (req: { method: string; url: string; body?: unknown }) => {
@@ -270,7 +270,7 @@ test("every requires entry names a flag the command actually declares", async ()
   // A stale name here is a trap: the flag it sits on becomes impossible to use,
   // because its partner can never be supplied. Renaming a flag has to update it.
   for (const command of ["update", "list"]) {
-    const args = depopSpec().byCommand(command)!.operation["x-mastro-args"] ?? [];
+    const args = depopSpec().byCommand(command)!.operation["x-depop-args"] ?? [];
     const declared = new Set(args.map((a) => a.name));
     for (const arg of args) {
       for (const partner of arg.requires ?? []) {
@@ -289,13 +289,13 @@ test("every requires entry names a flag the command actually declares", async ()
 
 /** A stand-in photo: the s3Put step reads the file's bytes even in a dry run. */
 function tempPhoto(): string {
-  const path = `/tmp/mastro-depop-test-${process.pid}.jpg`;
+  const path = `/tmp/depop-depop-test-${process.pid}.jpg`;
   writeFileSync(path, new Uint8Array([0xff, 0xd8, 0xff]));
   return path;
 }
 
 test("the create body pins boost off", async () => {
-  // The hard rule: mastro never enables a boost on a listing. Boost is a fixed
+  // The hard rule: depop never enables a boost on a listing. Boost is a fixed
   // `inactive` in the spec, so this fails the moment anyone flips it or wires it
   // to a flag.
   const steps = await plan("list", {

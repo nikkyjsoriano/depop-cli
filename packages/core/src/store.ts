@@ -1,74 +1,50 @@
 /**
- * Credential store — where validated captures live on disk.
+ * Credential store — where the validated capture lives on disk.
  *
  * `CredentialStore` is the interface; `FileStore` is the default backend
- * (one JSON file per provider under ~/.mastro/credentials, mode 0600).
- * Keychain / secret-manager backends can implement the same interface later.
+ * (~/.depop/credential.json, mode 0600). Keychain / secret-manager backends
+ * can implement the same interface later.
  */
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import type { PersistedCredential } from "./types.ts";
 
 export interface CredentialStore {
-  get(providerId: string): PersistedCredential | undefined;
-  set(providerId: string, credential: PersistedCredential): void;
-  delete(providerId: string): boolean;
-  list(): string[];
+  get(): PersistedCredential | undefined;
+  set(credential: PersistedCredential): void;
+  delete(): boolean;
 }
 
-/** Default root: ~/.mastro (override with MASTRO_HOME). */
-export function mastroHome(): string {
-  return process.env.MASTRO_HOME ?? join(homedir(), ".mastro");
+/** Default root: ~/.depop (override with DEPOP_HOME). */
+export function depopHome(): string {
+  return process.env.DEPOP_HOME ?? join(homedir(), ".depop");
 }
 
 export class FileStore implements CredentialStore {
-  private readonly dir: string;
+  private readonly path: string;
 
-  constructor(root: string = mastroHome()) {
-    this.dir = join(root, "credentials");
+  constructor(root: string = depopHome()) {
+    this.path = join(root, "credential.json");
   }
 
-  get(providerId: string): PersistedCredential | undefined {
-    const path = this.pathFor(providerId);
-    if (!existsSync(path)) return undefined;
-    return JSON.parse(readFileSync(path, "utf8")) as PersistedCredential;
+  get(): PersistedCredential | undefined {
+    if (!existsSync(this.path)) return undefined;
+    return JSON.parse(readFileSync(this.path, "utf8")) as PersistedCredential;
   }
 
-  set(providerId: string, credential: PersistedCredential): void {
-    mkdirSync(this.dir, { recursive: true, mode: 0o700 });
-    const path = this.pathFor(providerId);
+  set(credential: PersistedCredential): void {
+    mkdirSync(dirname(this.path), { recursive: true, mode: 0o700 });
     // Write then tighten perms — the secret never touches a world-readable file.
-    writeFileSync(path, JSON.stringify(credential, null, 2), { mode: 0o600 });
-    chmodSync(path, 0o600);
+    writeFileSync(this.path, JSON.stringify(credential, null, 2), { mode: 0o600 });
+    chmodSync(this.path, 0o600);
   }
 
-  delete(providerId: string): boolean {
-    const path = this.pathFor(providerId);
-    if (!existsSync(path)) return false;
-    rmSync(path);
+  delete(): boolean {
+    if (!existsSync(this.path)) return false;
+    rmSync(this.path);
     return true;
-  }
-
-  list(): string[] {
-    if (!existsSync(this.dir)) return [];
-    return readdirSync(this.dir)
-      .filter((f) => f.endsWith(".json"))
-      .map((f) => f.slice(0, -".json".length))
-      .sort();
-  }
-
-  private pathFor(providerId: string): string {
-    return join(this.dir, `${providerId}.json`);
   }
 }
 

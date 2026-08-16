@@ -1,13 +1,13 @@
 /**
- * Dynamic per-provider dispatch: `mastro <provider> <command> [flags]`.
+ * Dynamic command dispatch: `depop <command> [flags]`.
  *
- * Commands aren't hard-coded — they're the operations in the provider's OpenAPI
- * spec (operationId / x-mastro-command). Flags are the operation's parameters;
- * their choices come from `schema.enum`. This is what makes a connector
+ * Commands aren't hard-coded — they're the operations in `spec/openapi.yaml`
+ * (operationId / x-depop-command). Flags are the operation's parameters; their
+ * choices come from `schema.enum`. This is what makes the connector
  * "data, not code".
  */
-import type { OperationView, Provider } from "@mastro/core";
-import { Connector } from "@mastro/sdk";
+import type { Definition, OperationView } from "@depop/core";
+import { Connector } from "@depop/sdk";
 
 import {
   buildArgsMap,
@@ -19,40 +19,29 @@ import {
 import type { CliContext } from "../context.ts";
 import { emit, pc, ui } from "../output.ts";
 
-/** The CLI flags for an operation — its parameters, or a workflow's x-mastro-args. */
+/** The CLI flags for an operation — its parameters, or a workflow's x-depop-args. */
 function flagsFor(op: OperationView): CliFlag[] {
-  if (op.isWorkflow) return (op.operation["x-mastro-args"] ?? []).map(flagFromWorkflowArg);
+  if (op.isWorkflow) return (op.operation["x-depop-args"] ?? []).map(flagFromWorkflowArg);
   return op.parameters.map(flagFromParameter);
 }
 
-export async function runConnector(
+export async function runCommand(
   ctx: CliContext,
-  providerId: string,
-  rest: string[],
+  commandName: string,
+  commandArgs: string[],
   asJson: boolean,
 ): Promise<number> {
-  const provider = ctx.registry.load(providerId);
+  const { definition } = ctx;
 
-  if (!provider.spec) {
-    ui.error(`"${providerId}" has no OpenAPI spec yet — only \`mastro login ${providerId}\` works.`);
-    return 1;
-  }
-
-  const [commandName, ...commandArgs] = rest;
-  if (!commandName || commandName === "--help" || commandName === "-h") {
-    printProviderHelp(provider);
-    return commandName ? 0 : 1;
-  }
-
-  const op = provider.spec.byCommand(commandName);
+  const op = definition.spec.byCommand(commandName);
   if (!op) {
-    ui.error(`Unknown command "${commandName}" for ${providerId}.`);
-    printProviderHelp(provider);
+    ui.error(`Unknown command "${commandName}".`);
+    printCommands(definition);
     return 1;
   }
 
   if (commandArgs.includes("--help") || commandArgs.includes("-h")) {
-    printOperationHelp(providerId, op);
+    printOperationHelp(op);
     return 0;
   }
 
@@ -64,7 +53,7 @@ export async function runConnector(
   const parsed = parseArgs(opArgs, flags);
 
   // The first positional binds to the first declared flag, so
-  // `mastro depop search "t-shirt"` works without naming the flag.
+  // `depop search "t-shirt"` works without naming the flag.
   if (parsed.positionals.length > 0 && flags[0] && parsed.flags[flags[0].name] === undefined) {
     parsed.flags[flags[0].name] = parsed.positionals[0]!;
   }
@@ -72,7 +61,7 @@ export async function runConnector(
   const args = buildArgsMap(parsed, flags);
 
   // Auth is only required to actually call the operation.
-  const connector = Connector.load(provider, ctx.store);
+  const connector = Connector.load(definition, ctx.store);
   try {
     if (op.isWorkflow) {
       const result = await connector.runWorkflow(op, args, { dryRun });
@@ -90,22 +79,18 @@ export async function runConnector(
 
 // -- help rendering ---------------------------------------------------------
 
-function printProviderHelp(provider: Provider): void {
-  ui.heading(`mastro ${provider.id} — ${provider.manifest.display_name}`);
-  const cmds = provider.spec?.commands() ?? [];
-  if (cmds.length === 0) {
-    ui.info("This connector exposes no commands yet.");
-    return;
-  }
+/** The spec's commands — used by `--help` and by the unknown-command error. */
+export function printCommands(definition: Definition): void {
+  const cmds = definition.spec.commands();
   ui.print("\nCommands:");
   for (const c of cmds) {
     ui.print(`  ${pc.bold((c.command ?? "").padEnd(16))} ${pc.dim(c.summary ?? "")}`);
   }
-  ui.print(`\nRun \`mastro ${provider.id} <command> --help\` for flags.`);
+  ui.print("\nRun `depop <command> --help` for flags.");
 }
 
-function printOperationHelp(providerId: string, op: OperationView): void {
-  ui.heading(`mastro ${providerId} ${op.command}`);
+function printOperationHelp(op: OperationView): void {
+  ui.heading(`depop ${op.command}`);
   if (op.summary) ui.print(op.summary);
   if (op.description) ui.print(pc.dim(op.description));
 

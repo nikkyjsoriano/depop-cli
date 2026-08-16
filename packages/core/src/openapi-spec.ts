@@ -3,12 +3,12 @@
  *
  * This is the layer the SDK and CLI consume — it flattens paths × methods into
  * `OperationView`s (with a resolved command name, base URL, parameters, and the
- * x-mastro extensions already pulled out), so callers never walk the raw doc.
+ * x-depop extensions already pulled out), so callers never walk the raw doc.
  */
 import {
   type HttpMethod,
-  type MastroAuth,
-  type MastroReplay,
+  type DepopAuth,
+  type DepopReplay,
   type OpenApiDocument,
   type Operation,
   type Parameter,
@@ -27,7 +27,7 @@ export class OpenApiSpecError extends Error {
 export interface OperationView {
   /** Stable id (operationId, or `${method} ${path}` if absent). */
   id: string;
-  /** CLI subcommand name (x-mastro-command ?? operationId). Undefined → hidden. */
+  /** CLI subcommand name (x-depop-command ?? operationId). Undefined → hidden. */
   command: string | undefined;
   method: HttpMethod;
   path: string;
@@ -62,12 +62,12 @@ export class OpenApiSpec {
     return url;
   }
 
-  auth(): MastroAuth {
-    return this.doc["x-mastro-auth"] ?? {};
+  auth(): DepopAuth {
+    return this.doc["x-depop-auth"] ?? {};
   }
 
-  replay(): MastroReplay {
-    return this.doc["x-mastro-replay"] ?? {};
+  replay(): DepopReplay {
+    return this.doc["x-depop-replay"] ?? {};
   }
 
   /** All operations, hidden or not. */
@@ -97,10 +97,10 @@ export class OpenApiSpec {
         if (!operation) continue;
 
         const id = operation.operationId ?? `${method} ${path}`;
-        const hidden = operation["x-mastro-hidden"] === true;
+        const hidden = operation["x-depop-hidden"] === true;
         const command = hidden
           ? undefined
-          : (operation["x-mastro-command"] ?? operation.operationId);
+          : (operation["x-depop-command"] ?? operation.operationId);
 
         out.push({
           id,
@@ -112,7 +112,7 @@ export class OpenApiSpec {
           parameters: operation.parameters ?? [],
           operation,
           hidden,
-          isWorkflow: operation["x-mastro-workflow"] !== undefined,
+          isWorkflow: operation["x-depop-workflow"] !== undefined,
         });
       }
     }

@@ -1,15 +1,15 @@
 /**
  * Auth broker — orchestrates a single capture.
  *
- *   load provider → start receiver → open browser → wait for capture
+ *   start receiver → open browser → wait for capture
  *     → validate against the manifest → persist a minimal credential.
  *
- * The broker owns the *how* of capture; the provider manifest owns the *what*.
+ * The broker owns the *how* of capture; the auth manifest owns the *what*.
  */
 import { openInBrowser } from "./browser.ts";
 import { Receiver } from "./receiver.ts";
 import { isExpired, unixNow, type CredentialStore } from "./store.ts";
-import type { Provider } from "./registry.ts";
+import type { Definition } from "./definition.ts";
 import type { CaptureBundle, PersistedCredential, ValidationResult } from "./types.ts";
 
 export interface CaptureEvents {
@@ -21,13 +21,13 @@ export interface CaptureEvents {
 
 /**
  * Probes whether a freshly-captured credential actually works, by calling the
- * provider's `x-mastro-auth.verify` operation. Injected by the CLI so the broker
- * (in @mastro/core) doesn't depend on the SDK's Connector. Returns the real
+ * spec's `x-depop-auth.verify` operation. Injected by the CLI so the broker
+ * (in @depop/core) doesn't depend on the SDK's Connector. Returns the real
  * outcome to store on the credential. Should not throw — a failed probe is a
  * `{ ok: false }` result, not an exception.
  */
 export type CredentialVerifier = (
-  provider: Provider,
+  definition: Definition,
   credential: PersistedCredential,
 ) => Promise<ValidationResult>;
 
@@ -42,17 +42,17 @@ export class AuthBroker {
   constructor(private readonly store: CredentialStore) {}
 
   /**
-   * Run the full capture flow for a provider and persist the result.
+   * Run the full capture flow and persist the result.
    * Returns the stored credential.
    */
   async capture(
-    provider: Provider,
+    definition: Definition,
     events: CaptureEvents = {},
     options: CaptureOptions = {},
   ): Promise<PersistedCredential> {
-    const { manifest } = provider;
+    const { manifest } = definition;
     const receiver = new Receiver({
-      providerId: provider.id,
+      providerId: manifest.provider_id,
       displayName: manifest.display_name,
       launchUrl: manifest.launch.url,
       manifest,
@@ -75,20 +75,20 @@ export class AuthBroker {
     }
 
     events.onStatus?.("Captured. Validating…");
-    const credential = this.toCredential(provider, bundle);
-    this.validate(provider, credential);
+    const credential = this.toCredential(definition, bundle);
+    this.validate(definition, credential);
 
     // If the spec declares a verify op and the CLI injected a verifier, probe
     // the live session so `validation` reflects reality (a 401 here means the
     // capture is structurally fine but the session doesn't actually work).
-    const verifyOp = provider.spec?.auth().verify;
+    const verifyOp = definition.spec.auth().verify;
     if (verifyOp && options.verify) {
       events.onStatus?.("Verifying the session works…");
       // The verifier is contracted not to throw, but a misbehaving one must not
       // take down the capture or leave the credential unrecorded — treat an
       // unexpected throw as a failed probe.
       try {
-        credential.validation = await options.verify(provider, credential);
+        credential.validation = await options.verify(definition, credential);
       } catch (err) {
         credential.validation = {
           ok: false,
@@ -97,7 +97,7 @@ export class AuthBroker {
         };
       }
       if (!credential.validation.ok) {
-        this.store.set(provider.id, credential);
+        this.store.set(credential);
         throw new BrokerError(
           `Captured a credential for ${manifest.display_name}, but a test call failed` +
             (credential.validation.detail ? ` (${credential.validation.detail})` : "") +
@@ -106,7 +106,7 @@ export class AuthBroker {
       }
     }
 
-    this.store.set(provider.id, credential);
+    this.store.set(credential);
     return credential;
   }
 
@@ -116,9 +116,9 @@ export class AuthBroker {
    * probe (see `capture`), so its presence honestly means "the session was
    * actually tested", not just "the fields parsed".
    */
-  private toCredential(provider: Provider, bundle: CaptureBundle): PersistedCredential {
+  private toCredential(definition: Definition, bundle: CaptureBundle): PersistedCredential {
     return {
-      provider_id: provider.id,
+      provider_id: definition.manifest.provider_id,
       captured_at: bundle.captured_at ?? unixNow(),
       expires_at: bundle.expires_at,
       fields: bundle.credentials,
@@ -126,19 +126,19 @@ export class AuthBroker {
     };
   }
 
-  /** Structural validation against the manifest + OpenAPI x-mastro-auth requirements. */
-  private validate(provider: Provider, credential: PersistedCredential): void {
+  /** Structural validation against the manifest + OpenAPI x-depop-auth requirements. */
+  private validate(definition: Definition, credential: PersistedCredential): void {
     if (isExpired(credential)) {
       throw new BrokerError("captured credential is already expired");
     }
 
-    // Every field the spec's x-mastro-auth needs must be present & truthy.
-    const required = provider.spec?.auth().required_fields ?? [];
+    // Every field the spec's x-depop-auth needs must be present & truthy.
+    const required = definition.spec.auth().required_fields ?? [];
     const missing = required.filter((f) => !truthy(credential.fields[f]));
     if (missing.length > 0) {
       throw new BrokerError(
         `capture is missing required field(s): ${missing.join(", ")}. ` +
-          `Are you fully logged in to ${provider.manifest.display_name}?`,
+          `Are you fully logged in to ${definition.manifest.display_name}?`,
       );
     }
   }
