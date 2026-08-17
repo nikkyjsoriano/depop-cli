@@ -177,6 +177,7 @@ help is auto-generated. The CLI is a thin, faithful projection of the spec.
 | `depop me` | The logged-in user's profile. |
 | `depop list --photo … [fields]` | List an item for sale (multi-step: upload photos → poll → create). |
 | `depop update <slug> [fields]` | Edit an existing listing; photos and untouched fields are preserved. |
+| `depop discount <slug> --percent <0,5-95>` | Put a listing on sale, change the discount depth, or remove it (`--percent 0`). |
 
 `depop <command> --help` is generated from the spec — trust it over anything
 written here. Anything that writes supports `--dry-run`.

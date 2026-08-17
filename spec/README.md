@@ -200,12 +200,65 @@ matching it is matching reality. Pass `--address --lat --lng` to override.
 > field for field, so drift shows up in the test suite rather than on a live
 > listing. **Dry-run first and check the body.**
 >
-> ⚠️ **Not covered by that capture:** the listing edited had no active discount.
-> A listing on sale carries `pricing.discounted_price` alongside the original,
-> and this flow sends the original as `price_amount`, on the assumption the
-> discount is a separate object that survives the write. That has not been
-> verified. Editing a discounted listing could drop the sale, so check one by
-> hand before trusting it.
+> **Resolved:** an earlier version of this doc flagged that the capture never
+> exercised a discounted listing, and that `update` sending the original price
+> as `price_amount` might silently drop an active sale. Verified live on
+> 2026-08-16 (see "Discounting a listing" below): the discount is **not part
+> of the product object at all** — it lives on a wholly separate resource,
+> `PATCH /api/v2/discounts/`, keyed by numeric product id. `update`'s edit form
+> has no discount field and never sends one, so there was never anything to
+> drop. Editing a discounted listing through `update` is safe.
+
+### Discounting a listing
+
+Puts a listing on sale, changes the depth of an existing sale, or ends one —
+the seller hub's "Discount" bulk-action tool, applied to one listing.
+
+```bash
+depop discount seller-asics-gel-1130-543c --percent 20 --dry-run
+depop discount seller-asics-gel-1130-543c --percent 20
+depop discount seller-asics-gel-1130-543c --percent 0   # remove the discount
+```
+
+**Takes the listing slug, not the id** (same convention as `update`) — the
+command resolves it to Depop's internal numeric product id itself.
+
+`--percent` is **required** and only accepts `0` or a multiple of `5` up to
+`95` — that's the seller hub's own slider (`min=5 max=95 step=5`), not a free
+integer, and `0` is how the UI's "Remove Discount" button is expressed on the
+wire. There's no separate delete endpoint.
+
+Percentages are always taken off the **original** price, never the current
+(already-discounted) one, and applying a new percentage **replaces** any
+existing discount rather than stacking on it — matching the seller hub's own
+"adding this discount will replace any existing discount on these items"
+warning.
+
+The command returns the write's own response (resulting original/discounted
+price and percentage) — there's no separate read-back, since the discount
+endpoint already reports the outcome.
+
+#### How it works
+
+```
+GET   https://webapi.depop.com/presentation/api/v1/products/by-slug/<slug>/edit-listing/   (resolve slug -> id)
+PATCH https://webapi.depop.com/api/v2/discounts/
+      [{ "product_id": <id>, "discount_percentage": <0 or 5-95> }]
+      -> 200 {"products":[{"product_id":...,"undiscounted_price":"130.00",
+                            "discounted_price":"97.50","discount_percentage":25,
+                            "discount_type":"PERCENTAGE"}]}
+```
+
+The PATCH body is a **single-element array**, matching the seller hub's
+bulk-action shape even when only one listing is selected.
+
+> Reverse-engineered from the seller hub's Bulk Actions "Discount" tool
+> (depop.com/sellinghub/selling/active/), captured live on 2026-08-16: applied
+> a 30% discount to a real listing, changed it to 25%, removed it, then
+> restored the original 40% discount the listing had before capture began.
+> `packages/sdk/test/depop-discount.test.ts` pins the request/response shape.
+> Not covered by that capture: whether a currency other than the listing's own
+> can be passed (the UI never offers one, so the connector doesn't either).
 
 ### Search filters
 

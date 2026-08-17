@@ -549,6 +549,74 @@ paths:
       responses:
         "204": { description: Listing replaced. }
 
+  # =========================================================================
+  # Discount a listing — reverse-engineered from the seller hub's Bulk Actions
+  # "Discount" tool (depop.com/sellinghub/selling/active/, 2026-08-16).
+  #
+  # Unlike `update`, the discount is NOT part of the product object at all: it
+  # lives on a wholly separate resource, keyed by the numeric product id (not
+  # the slug). This is why `update`'s replacing PUT (see above) cannot drop a
+  # listing's sale — there was never a discount field in that payload to
+  # begin with. That resolves the open question the `update` capture left:
+  # editing a discounted listing is safe.
+  #
+  #   PATCH https://webapi.depop.com/api/v2/discounts/
+  #   body: [{ "product_id": <int>, "discount_percentage": <int> }]
+  #   -> 200 {"products":[{"product_id":...,"undiscounted_price":"130.00",
+  #                         "discounted_price":"97.50","discount_percentage":25,
+  #                         "discount_type":"PERCENTAGE"}]}
+  #
+  # The UI's slider only allows 5%-95% in steps of 5 (input min=5 max=95
+  # step=5) — not a free integer. Percentages are always taken off the
+  # ORIGINAL price, never the current (already-discounted) one: applying a new
+  # percentage replaces the old discount rather than stacking on it (the UI
+  # warns "adding this discount will replace any existing discount on these
+  # items"). Removing a sale is the exact same PATCH with
+  # discount_percentage: 0 — Depop has no separate delete endpoint, confirmed
+  # live via the seller hub's "Remove Discount" button.
+  #
+  # Keyed by product id, so this flow reads the listing first (the same
+  # getListingForEdit the update workflow uses) purely to resolve slug -> id;
+  # nothing else from that read is needed, since the PATCH response already
+  # carries the resulting prices.
+  # =========================================================================
+  /x-depop/discount:
+    post:
+      operationId: discount
+      x-depop-command: discount
+      summary: Set or remove a listing's sale discount.
+      description: >
+        Sets the percentage off a listing's original price, or removes an
+        existing discount. Takes the listing slug positionally, e.g. `depop
+        discount dudu-bear-asics-gel-1130-543c --percent 20`. Pass `--percent
+        0` to remove the discount and restore the original price.
+      x-depop-args:
+        - { name: slug, description: "listing slug, the last path segment of the listing URL", required: true }
+        - { name: percent, required: true,
+            description: "percent off the original price, 5-95 in steps of 5 (0 removes the discount)",
+            enum: ["0", "5", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55", "60", "65", "70", "75", "80", "85", "90", "95"] }
+      x-depop-workflow:
+        result: setDiscount.products.0
+        steps:
+          # 1. Resolve slug -> numeric product id (the discount endpoint has no
+          #    concept of a slug).
+          - id: current
+            operationId: getListingForEdit
+            request:
+              url: "https://webapi.depop.com/presentation/api/v1/products/by-slug/${args.slug}/edit-listing/"
+
+          # 2. The write itself. Single-element array, matching the seller
+          #    hub's bulk-action shape even for one listing.
+          - id: setDiscount
+            operationId: setDiscount
+            request:
+              url: "https://webapi.depop.com/api/v2/discounts/"
+              body:
+                - product_id: "${num:steps.current.id}"
+                  discount_percentage: "${num:args.percent}"
+      responses:
+        "200": { description: Resulting discount state for the listing. }
+
   /presentation/api/v1/listing/products/:
     post:
       operationId: createListing
@@ -585,6 +653,19 @@ paths:
         - { name: slug, in: path, required: true, schema: { type: string } }
       responses:
         "204": { description: Listing replaced. No body. }
+
+  /api/v2/discounts/:
+    patch:
+      operationId: setDiscount
+      x-depop-hidden: true
+      summary: Set or clear a listing's discount by product id (bulk-shaped, one element).
+      description: >
+        The seller hub's "Discount" bulk action. Body is an array (even for a
+        single listing): `[{ product_id, discount_percentage }]`.
+        discount_percentage: 0 removes the discount; any other value replaces
+        it (never stacks on an existing one).
+      responses:
+        "200": { description: Resulting discount state per product. }
 
   /api/v4/pictures/:
     post:
