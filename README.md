@@ -178,6 +178,9 @@ help is auto-generated. The CLI is a thin, faithful projection of the spec.
 | `depop list --photo … [fields]` | List an item for sale (multi-step: upload photos → poll → create). |
 | `depop update <slug> [fields]` | Edit an existing listing; photos and untouched fields are preserved. |
 | `depop discount <slug> --percent <0,5-95>` | Put a listing on sale, change the discount depth, or remove it (`--percent 0`). |
+| `depop offers` | Every listing of yours that has offers, with a per-listing count. |
+| `depop likers` | Buyers who liked an item but haven't offered. |
+| `depop offer-accept <slug> --offer <uuid>` | Accept a buyer's offer. Real sale, no undo. |
 
 `depop <command> --help` is generated from the spec — trust it over anything
 written here. Anything that writes supports `--dry-run`.
@@ -273,7 +276,7 @@ depop-cli/
 │   └── cli/         @depop/cli — the `depop` binary
 ├── extension/       generic MV3 capture + browser-proxy runtime (plain JS, type-checked)
 ├── spec/            openapi.yaml + auth.manifest.json + reference/ — the connector
-├── skills/          agent skills: depop (session model) · search
+├── skills/          agent skills: depop (session model) · search · discount · offers
 ├── bin/             node launcher shim for npx/global installs
 └── docs/            SPEC · BROWSER-PROXY · WORKFLOWS
 ```

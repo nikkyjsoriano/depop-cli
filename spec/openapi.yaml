@@ -617,6 +617,122 @@ paths:
       responses:
         "200": { description: Resulting discount state for the listing. }
 
+  # =========================================================================
+  # Offers — reverse-engineered from the seller hub's Offers page
+  # (depop.com/sellinghub/offers/, captured live 2026-08-17).
+  #
+  # Two reads and one write, all on the webapi host, each confirmed live:
+  #
+  #   GET  /presentation/api/v1/offers/me/products/          per-listing summary
+  #   GET  /api/v1/user/likes/notifications/                 likers (send-offer candidates)
+  #   POST /presentation/api/v1/products/<pid>/offers/<oid>/ answer one offer
+  #        body: {"seller_response": "ACCEPT"}
+  #
+  # Offers are scoped to a product *and a variant* (size) — the UI routes as
+  # /sellinghub/offers/<pid>/?variantId=<n> — but the write keys off product id
+  # alone.
+  #
+  # `offer_id` is a UUID string, not an integer like every other id in this
+  # spec. `offer_count` on the summary is also a STRING and saturates: a
+  # listing with more than ten offers reports "10+", not a number. Neither is
+  # safe to coerce.
+  #
+  # The write endpoint is one operation discriminated by `seller_response`.
+  # Only ACCEPT is implemented, because only ACCEPT was captured; DECLINE and
+  # COUNTER are inferred and deliberately not shipped.
+  #
+  # NOT IMPLEMENTED, tracked in issues: reading the individual offers on a
+  # listing (GET /presentation/api/v1/products/<pid>/offers/ — returns 400 when
+  # replayed, cause unknown), offer-decline, offer-counter, and sending offers
+  # to all likers. Until the read lands, offer ids for offer-accept have to come
+  # from the Depop web UI.
+  #
+  # Accepting is NOT exclusive: it neither cancels nor expires the other offers
+  # on the listing, and a listing can hold several accepted offers at once
+  # (observed live — two accepted offers coexisted on one single-quantity
+  # item). Whoever completes checkout first presumably wins. Nothing in the API
+  # guards against overselling.
+  # =========================================================================
+  /x-depop/offers:
+    post:
+      operationId: offers
+      x-depop-command: offers
+      summary: List every listing of yours that has offers.
+      description: >
+        The Offers page's "Review offers" column: one row per listing+variant
+        with an offer count, not the offers themselves. Reading the individual
+        offers on a listing is not implemented yet, so use the Depop web UI to
+        see who offered what. Note `offer_count` is a string and reads "10+"
+        once a listing passes ten offers.
+      x-depop-workflow:
+        result: mine.objects
+        steps:
+          - id: mine
+            operationId: myOffers
+            request:
+              url: "https://webapi.depop.com/presentation/api/v1/offers/me/products/"
+      responses:
+        "200": { description: One row per listing with offers. }
+
+  /x-depop/offer-accept:
+    post:
+      operationId: offerAccept
+      x-depop-command: offer-accept
+      summary: Accept a buyer's offer.
+      description: >
+        Accepts one or more offers on a listing, e.g. `depop offer-accept
+        dudu-bear-new-balance-1906r-a1b2 --offer 7bf8388b-f5f4-4a02-a6c9-5c387163e1d3`.
+        Accepting gives the buyer roughly 24 hours to complete checkout.
+        Offer ids are UUIDs. There is no command that lists them yet, so take
+        them from the Depop web UI for now.
+        This is a real sale and there is no undo. It also does NOT cancel the
+        listing's other offers — accepting several offers on a one-of-one item
+        will oversell it.
+      x-depop-args:
+        - { name: slug, description: "listing slug, the last path segment of the listing URL", required: true }
+        - { name: offer, description: "offer id (uuid), from the Depop web UI — repeatable", required: true, multiple: true }
+      x-depop-workflow:
+        result: accept
+        steps:
+          - id: current
+            operationId: getListingForEdit
+            request:
+              url: "https://webapi.depop.com/presentation/api/v1/products/by-slug/${args.slug}/edit-listing/"
+
+          # One POST per offer. Note foreach has no error tolerance: a failure
+          # on the third of five aborts the run with the first two already
+          # accepted.
+          - id: accept
+            operationId: offerRespond
+            foreach: "${args.offer}"
+            request:
+              url: "https://webapi.depop.com/presentation/api/v1/products/${steps.current.id}/offers/${item}/"
+              body:
+                seller_response: ACCEPT
+      responses:
+        "200": { description: The accepted offer(s). }
+
+  /x-depop/likers:
+    post:
+      operationId: likers
+      x-depop-command: likers
+      summary: List buyers who liked your items and can be sent an offer.
+      description: >
+        The Offers page's "Send offers" column — buyers who liked one of your
+        items but haven't offered. Account-wide: the endpoint takes no listing
+        filter, so each entry carries its own `product`, and filtering to one
+        listing is the caller's job. Cursor-paginated via `meta.cursor` /
+        `meta.hasMore`, which this command does not follow.
+      x-depop-workflow:
+        result: likes.actionableLikes
+        steps:
+          - id: likes
+            operationId: likeNotifications
+            request:
+              url: "https://webapi.depop.com/api/v1/user/likes/notifications/"
+      responses:
+        "200": { description: Likers eligible for an offer. }
+
   /presentation/api/v1/listing/products/:
     post:
       operationId: createListing
@@ -666,6 +782,51 @@ paths:
         it (never stacks on an existing one).
       responses:
         "200": { description: Resulting discount state per product. }
+
+  # --- offers ---------------------------------------------------------------
+  /presentation/api/v1/offers/me/products/:
+    get:
+      operationId: myOffers
+      x-depop-hidden: true
+      summary: Listings of yours that have offers, with a per-listing count.
+      description: >
+        `{objects, page_info}`, the same envelope as search. Each object is
+        `{product_id, picture_data, description, price_amount, price_currency,
+        variant_set, variant_id, offer_count}`. `offer_count` is a string and
+        saturates at "10+"; it is not a number.
+      responses:
+        "200": { description: One row per listing with offers. }
+
+  /presentation/api/v1/products/{product_id}/offers/{offer_id}/:
+    post:
+      operationId: offerRespond
+      x-depop-hidden: true
+      summary: Answer one offer — accept, decline or counter.
+      description: >
+        One endpoint discriminated by the body's `seller_response`. Captured
+        live only as `{"seller_response": "ACCEPT"}`, which answers 200 with the
+        updated offer object (`offer_display_status: ACCEPTED`, `expires_at`
+        pushed ~24h out for the buyer to check out, plus
+        `offerers_highest_offer_value`). DECLINE and COUNTER are inferred from
+        that shape and are NOT verified. The seller hub fires this with no
+        confirmation step of its own.
+      parameters:
+        - { name: product_id, in: path, required: true, schema: { type: string } }
+        - { name: offer_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: The updated offer. }
+
+  /api/v1/user/likes/notifications/:
+    get:
+      operationId: likeNotifications
+      x-depop-hidden: true
+      summary: Buyers who liked your items and can be sent an offer.
+      description: >
+        `{meta: {cursor, hasMore}, actionableLikes: [{isNew, date, sender:
+        {id, username, firstName, lastName, country}, product: {id, ...}}]}`.
+        Cursor-paginated; account-wide, with no per-listing filter.
+      responses:
+        "200": { description: Likers eligible for an offer. }
 
   /api/v4/pictures/:
     post:
