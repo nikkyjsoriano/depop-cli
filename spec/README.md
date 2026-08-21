@@ -260,6 +260,89 @@ bulk-action shape even when only one listing is selected.
 > Not covered by that capture: whether a currency other than the listing's own
 > can be passed (the UI never offers one, so the connector doesn't either).
 
+### Offers
+
+Mirrors the seller hub's Offers page. Three commands ship; the rest of the
+surface is captured but unimplemented (see the caveats below).
+
+```bash
+depop offers --json                                   # which listings have offers
+depop likers --json                                   # who liked but hasn't offered
+depop offer-accept <slug> --offer <uuid> --dry-run
+depop offer-accept <slug> --offer <uuid>
+```
+
+`offer-accept` takes the listing **slug** positionally (same convention as
+`update` and `discount`) plus `--offer`, a **uuid** — offer ids are the one id
+in this API that isn't an integer. `--offer` is repeatable, so one call can
+accept several offers on the same listing.
+
+Two things in the read are easy to get wrong. `offer_count` on `depop offers` is
+a **string** that saturates at `"10+"`, so it can't be coerced to a number. And
+`depop likers` is account-wide with no per-listing filter — each entry carries
+its own `product`, and it is cursor-paginated (`meta.cursor` / `meta.hasMore`),
+of which the command returns only the first page.
+
+**Accepting is not exclusive.** It neither cancels nor expires the listing's
+other offers, and a listing can carry several accepted offers simultaneously —
+observed live, with two accepted offers on one single-quantity item. Nothing in
+the API guards against overselling; that judgement is the caller's.
+
+#### How it works
+
+```
+GET  https://webapi.depop.com/presentation/api/v1/offers/me/products/
+     -> 200 {"objects":[{"product_id":...,"description":...,"price_amount":"120.00",
+                          "variant_set":77,"variant_id":10,"offer_count":"10+"}],
+              "page_info":{"has_more":false}}
+
+GET  https://webapi.depop.com/api/v1/user/likes/notifications/
+     -> 200 {"meta":{"cursor":...,"hasMore":true},
+              "actionableLikes":[{"isNew":...,"date":...,
+                                   "sender":{"id":...,"username":...},
+                                   "product":{"id":...}}]}
+
+GET  https://webapi.depop.com/presentation/api/v1/products/by-slug/<slug>/edit-listing/   (resolve slug -> id)
+POST https://webapi.depop.com/presentation/api/v1/products/<id>/offers/<offer_id>/
+     {"seller_response": "ACCEPT"}
+     -> 200 {"offer_id":"<uuid>","offer_value":"103.00","offer_currency":"USD",
+              "expires_at":<+24h>,"offer_display_status":"ACCEPTED",
+              "can_make_counter_offer":false,
+              "offerers_highest_offer_value":"103.00"}
+```
+
+The write endpoint is discriminated by the body's `seller_response`. Offers are
+scoped to a product *and* a variant (the UI routes as
+`/sellinghub/offers/<id>/?variantId=<n>`), but the write keys off product id
+alone.
+
+> Reverse-engineered from the seller hub's Offers page
+> (depop.com/sellinghub/offers/), captured live on 2026-08-17: read the offer
+> summary and one listing's offers, then accepted a real $103.00 offer on a real
+> listing. `packages/sdk/test/depop-offers.test.ts` pins the shapes. `offers`
+> and `likers` were additionally re-run through the CLI against a live session;
+> `offer-accept` was confirmed to reach the endpoint (a non-existent offer id
+> answers 404, not a blanket rejection), but its success path has not been
+> re-run since it sells a real item.
+>
+> **Deliberately not implemented**, each tracked as a repo issue rather than
+> shipped on a guess:
+>
+> - **Reading a listing's individual offers.**
+>   `GET /presentation/api/v1/products/<id>/offers/` returns the full offer list
+>   in the browser but **HTTP 400 when replayed** through the CLI. Ruled out:
+>   templating, the preceding step, eight query-param variants, three different
+>   listings, and five header variants. The 400 body is an axios error string,
+>   so `/presentation/` is a BFF and its downstream call is what fails. Until
+>   this lands, offer ids for `offer-accept` must come from the web UI.
+> - **`offer-decline` / `offer-counter`.** Only `ACCEPT` was captured;
+>   `DECLINE` / `COUNTER` and the counter's price field name would be guesses.
+> - **Sending offers to likers.**
+>   `POST /presentation/api/v1/offers/products/<id>/offers/send-all/` and its
+>   `send-all/jobs/<jobId>/` poll exist (recovered from the app's route
+>   manifest) but were never captured. The job-poll pair maps cleanly onto a
+>   workflow `poll` step whenever someone captures it.
+
 ### Search filters
 
 Every filter from the website's filter bar is a flag, generated from the spec:
