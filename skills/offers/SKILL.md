@@ -1,6 +1,6 @@
 ---
 name: depop-offers
-description: Read Depop offer activity and accept buyer offers via the depop CLI — list which listings have offers, see who liked an item, and accept an offer by id. Use when the user mentions Depop offers, asks what offers they have, or wants to accept an offer ("any offers on my sneakers?", "accept that offer").
+description: Read Depop offer activity and accept buyer offers via the depop CLI — list which listings have offers, see the individual offers on one, see who liked an item, and accept an offer by id. Use when the user mentions Depop offers, asks what offers they have, or wants to accept an offer ("any offers on my sneakers?", "accept that offer").
 ---
 
 # Depop offers
@@ -11,14 +11,14 @@ invoke it as `npx -y depop-cli`.
 ## What exists today
 
 ```bash
-depop offers --json        # your listings that have offers, with a count each
-depop likers --json        # buyers who liked an item but haven't offered
+depop offers --json              # your listings that have offers, with a count each
+depop offer-list <slug> --json   # every offer on one listing, with ids
+depop likers --json               # buyers who liked an item but haven't offered
 depop offer-accept <slug> --offer <uuid>
 ```
 
-That is the whole surface. Reading the individual offers on a listing,
-declining, and countering are **not implemented** — see "Gaps" below. Don't
-invent flags for them.
+Declining, countering, and sending offers to all likers are **not
+implemented** — see "Gaps" below. Don't invent flags for them.
 
 ## Preconditions
 
@@ -42,6 +42,25 @@ not a number. Never parse it as an int, and never present "10+" as "10".
 `product.id` yourself. It is cursor-paginated and this command returns only the
 first page.
 
+## Listing individual offers
+
+```bash
+depop offer-list <slug> --json
+```
+
+`--slug` is the last path segment of the listing URL, same as `update` /
+`discount` / `offer-accept`. Returns the listing's current price/likes/offer
+stats plus every offer on it: `offer_id` (uuid — what `offer-accept` takes),
+`offerer_id` / `offerer_username`, `offer_value` / `offer_currency`,
+`expires_at`, `offer_display_status` (`RECEIVED` / `SENT_PRIVATE_OFFER` /
+`ACCEPTED` / `COUNTER_SENT`), and `can_make_counter_offer` (true only on
+`RECEIVED`). This is the only way to get offer ids without the Depop web UI.
+
+**Known limitations:** if the listing currently has no open offers at all,
+this command fails outright rather than guessing — there's nothing to list.
+If it has offers on more than one size, only one size's offers resolve
+reliably; not yet verified against a real multi-variant listing.
+
 ## Accepting
 
 ```bash
@@ -52,10 +71,9 @@ depop offer-accept <slug> --offer <uuid>
 `--slug` is the last path segment of the listing URL. `--offer` is a UUID and is
 repeatable, so one call can accept several offers on the same listing.
 
-**Where offer ids come from:** there is no command that lists them yet. Get them
-from the Depop web UI (Selling Hub → Offers → Review) and ask the user to paste
-them. Do not guess a uuid, and do not try to derive one from `depop offers` —
-that command returns product ids, not offer ids.
+**Where offer ids come from:** `depop offer-list <slug>`. Do not guess a uuid,
+and do not try to derive one from `depop offers` — that command returns
+product ids, not offer ids.
 
 ## Cautions
 
@@ -82,10 +100,15 @@ Not implemented, each tracked as a repo issue. If the user asks for one of
 these, say it isn't supported yet and point them at the Depop app rather than
 improvising:
 
-- **Listing the individual offers on a listing.** The endpoint returns HTTP 400
-  when replayed outside the browser; cause unknown.
-- **`offer-decline` / `offer-counter`.** The write endpoint takes a
-  `seller_response` field and only `ACCEPT` was ever captured. The other values
-  are guesses and were deliberately left out.
+- **`offer-decline`.** The accept endpoint takes a `seller_response` field and
+  only `ACCEPT` was ever captured; `DECLINE` is an unverified guess. It looked
+  safe to ship on the assumption it mirrors `offer-accept`'s shape, but
+  `offer-counter` (below) turning out to be a completely different endpoint
+  broke that assumption — don't trust it without its own live capture.
+- **`offer-counter`.** The endpoint is confirmed live
+  (`POST /presentation/api/v1/offers/<offer_id>/`, no `product_id` — a
+  *different* endpoint from accept/decline's), but its request body was not
+  captured: the browser extension's network logger missed the write. Do not
+  guess the price field name.
 - **Sending offers to all likers.** `depop likers` lists the candidates, but the
   send endpoint was never captured.

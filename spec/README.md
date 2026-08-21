@@ -262,11 +262,12 @@ bulk-action shape even when only one listing is selected.
 
 ### Offers
 
-Mirrors the seller hub's Offers page. Three commands ship; the rest of the
+Mirrors the seller hub's Offers page. Four commands ship; the rest of the
 surface is captured but unimplemented (see the caveats below).
 
 ```bash
 depop offers --json                                   # which listings have offers
+depop offer-list <slug> --json                        # every offer on one listing, with ids
 depop likers --json                                   # who liked but hasn't offered
 depop offer-accept <slug> --offer <uuid> --dry-run
 depop offer-accept <slug> --offer <uuid>
@@ -275,7 +276,9 @@ depop offer-accept <slug> --offer <uuid>
 `offer-accept` takes the listing **slug** positionally (same convention as
 `update` and `discount`) plus `--offer`, a **uuid** — offer ids are the one id
 in this API that isn't an integer. `--offer` is repeatable, so one call can
-accept several offers on the same listing.
+accept several offers on the same listing. `offer-list` takes just the slug and
+is the only source of offer ids today — see "How it works" below for why it
+needs two reads, not one.
 
 Two things in the read are easy to get wrong. `offer_count` on `depop offers` is
 a **string** that saturates at `"10+"`, so it can't be coerced to a number. And
@@ -309,34 +312,55 @@ POST https://webapi.depop.com/presentation/api/v1/products/<id>/offers/<offer_id
               "expires_at":<+24h>,"offer_display_status":"ACCEPTED",
               "can_make_counter_offer":false,
               "offerers_highest_offer_value":"103.00"}
+
+GET  https://webapi.depop.com/presentation/api/v1/products/by-slug/<slug>/edit-listing/   (resolve slug -> id)
+GET  https://webapi.depop.com/presentation/api/v1/offers/me/products/                     (resolve id -> variant_id)
+GET  https://webapi.depop.com/presentation/api/v1/products/<id>/offers/?active=true&include_size=true&variant_id=<n>
+     -> 200 {"product_id":...,"prices":{...},"variant_id":...,"size":"US 11.5",
+              "listing_stats":{"likes_count":...,"recent_offers_count":...},
+              "offers":[{"offer_id":"<uuid>","offerer_username":...,
+                          "offer_value":"60.00","offer_display_status":"RECEIVED",
+                          "can_make_counter_offer":true, ...}]}
 ```
 
-The write endpoint is discriminated by the body's `seller_response`. Offers are
-scoped to a product *and* a variant (the UI routes as
-`/sellinghub/offers/<id>/?variantId=<n>`), but the write keys off product id
-alone.
+The accept/decline write endpoint is discriminated by the body's
+`seller_response`. Offers are scoped to a product *and* a variant (the UI
+routes as `/sellinghub/offers/<id>/?variantId=<n>`), but the write keys off
+product id alone. The individual-offers **read** needs that same `variant_id`
+as a query param, and there's no endpoint that hands it back for a bare
+product id — `offer-list` gets it by re-fetching `depop offers`'s summary
+(which already carries `variant_id` per product) and matching this listing's
+row, hence the extra GET.
 
 > Reverse-engineered from the seller hub's Offers page
 > (depop.com/sellinghub/offers/), captured live on 2026-08-17: read the offer
 > summary and one listing's offers, then accepted a real $103.00 offer on a real
-> listing. `packages/sdk/test/depop-offers.test.ts` pins the shapes. `offers`
-> and `likers` were additionally re-run through the CLI against a live session;
-> `offer-accept` was confirmed to reach the endpoint (a non-existent offer id
-> answers 404, not a blanket rejection), but its success path has not been
-> re-run since it sells a real item.
+> listing. The individual-offers read's 400 was fixed live on 2026-08-20 (issue
+> #14) — the missing piece was passing `active=true&include_size=true` *together
+> with* `variant_id`, not any of them alone. That same session countered a real
+> $60.00 offer to $64.00 through the seller hub UI to probe the counter
+> endpoint: it's `POST /presentation/api/v1/offers/<offer_id>/`, a genuinely
+> different endpoint from accept/decline's (no `product_id` in the path), but
+> its request body was not recovered — the browser extension's own network
+> logger missed the write, and only the URL survived (read off
+> `performance.getEntriesByType("resource")` after the fact). Next attempt:
+> keep Chrome DevTools' Network tab open with "Preserve log" on *before*
+> clicking Counter. `packages/sdk/test/depop-offers.test.ts` pins the shapes.
+> `offers`, `likers`, and `offer-list` were additionally re-run through the CLI
+> against a live session; `offer-accept` was confirmed to reach the endpoint (a
+> non-existent offer id answers 404, not a blanket rejection), but its success
+> path has not been re-run since it sells a real item.
 >
 > **Deliberately not implemented**, each tracked as a repo issue rather than
 > shipped on a guess:
 >
-> - **Reading a listing's individual offers.**
->   `GET /presentation/api/v1/products/<id>/offers/` returns the full offer list
->   in the browser but **HTTP 400 when replayed** through the CLI. Ruled out:
->   templating, the preceding step, eight query-param variants, three different
->   listings, and five header variants. The 400 body is an axios error string,
->   so `/presentation/` is a BFF and its downstream call is what fails. Until
->   this lands, offer ids for `offer-accept` must come from the web UI.
-> - **`offer-decline` / `offer-counter`.** Only `ACCEPT` was captured;
->   `DECLINE` / `COUNTER` and the counter's price field name would be guesses.
+> - **`offer-decline`.** Only `ACCEPT` was captured on the accept/decline
+>   endpoint; `DECLINE` looked like a safe mirror of that shape until
+>   `offer-counter` turned out to be a wholly different endpoint, which broke
+>   the assumption that "answer this offer" actions share one shape. Held back
+>   pending its own live capture.
+> - **`offer-counter`'s request body.** Endpoint confirmed (above); body is
+>   not. Do not guess the price field name.
 > - **Sending offers to likers.**
 >   `POST /presentation/api/v1/offers/products/<id>/offers/send-all/` and its
 >   `send-all/jobs/<jobId>/` poll exist (recovered from the app's route

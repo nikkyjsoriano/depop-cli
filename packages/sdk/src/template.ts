@@ -24,6 +24,8 @@ const WHOLE = /^\$\{((?:[^{}]|\{\})+)\}$/;
 const PART = /\$\{([^}]+)\}/g;
 /** An innermost placeholder: `${...}` whose body has no nested `${`. */
 const INNER = /\$\{([^${}]+)\}/;
+/** A path segment's array-match subscript: `objects[product_id=858417177]`. */
+const SUBSCRIPT = /^([^[]*)\[([^=[\]]+)=([^\]]+)\]$/;
 
 export class MissingTemplateValue extends Error {
   constructor(public readonly expr: string) {
@@ -186,9 +188,23 @@ function lookup(expr: string, ctx: TemplateContext): unknown {
   const path = pipe === -1 ? expr : expr.slice(0, pipe);
   const fallback = pipe === -1 ? undefined : expr.slice(pipe + 1);
 
-  const value = path.split(".").reduce<unknown>((acc, key) => {
+  const value = path.split(".").reduce<unknown>((acc, rawSeg) => {
     if (acc == null || typeof acc !== "object") return undefined;
-    return (acc as Record<string, unknown>)[key];
+    const m = rawSeg.match(SUBSCRIPT);
+    if (!m) return (acc as Record<string, unknown>)[rawSeg];
+    // `key[field=value]` — find the element of the array at `key` whose
+    // `field` stringifies to `value`, instead of indexing by key. Lets a
+    // workflow step cross-reference two independently fetched resources by a
+    // shared id, e.g. `${steps.mine.objects[product_id=${steps.current.id}].variant_id}`
+    // — the nested `${steps.current.id}` is already a literal by the time this
+    // runs (see resolveNested). Under --dry-run the array isn't real yet (it's
+    // a step stub), so the filter is skipped and the stub passes through
+    // unfiltered — a downstream `.field` access still resolves to a
+    // placeholder instead of throwing.
+    const [, key, field, want] = m;
+    const arr = key ? (acc as Record<string, unknown>)[key] : acc;
+    if (!Array.isArray(arr)) return arr;
+    return arr.find((el) => el != null && typeof el === "object" && String((el as Record<string, unknown>)[field!]) === want);
   }, ctx);
 
   // A leaf that resolves to a zero-arg function is a generator (e.g. `${uuid}`,

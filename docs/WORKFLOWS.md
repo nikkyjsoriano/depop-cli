@@ -153,6 +153,15 @@ that into a usage error before anything is sent.
   serializes as a JSON number (`${num:args.lat}` → `37.78`, not `"37.78"`)
 - **nested** — an inner `${...}` inside another resolves first:
   `${steps.slots.${index}}` becomes `${steps.slots.0}` then the slot URL.
+- `${steps.<id>.<array>[<field>=<value>].<path>}` — find the element of an
+  array whose `<field>` equals `<value>` (usually itself a nested `${...}`,
+  resolved first), then continue into it. Cross-references two independently
+  fetched resources by a shared id — e.g. `offer-list` resolves a listing's
+  `variant_id` this way, from the summary `offers` already fetches:
+  `${steps.mine.objects[product_id=${steps.current.id}].variant_id}`. No
+  match resolves to undefined like any other missing field. On a dry-run
+  stub the array isn't real yet, so the filter is skipped and the stub
+  passes through instead.
 
 A whole-placeholder string (`"${steps.slots}"`) preserves the resolved value's
 type (array/object/number); a mixed string interpolates to text. In a body
