@@ -57,6 +57,37 @@ test("${path:+literal} renders the literal only when the path is set", () => {
   expect(renderTemplate("${a:+one|two}", { a: "set" })).toBe("one|two");
 });
 
+// -- [field=value] array-match subscript -------------------------------
+// Cross-references two independently fetched resources by a shared id inside
+// a workflow, e.g. resolving a listing's variant_id from the `offers`
+// summary by matching its product_id — see `offer-list` in openapi.yaml.
+
+test("[field=value] finds the array element matching field, then continues the path", () => {
+  const ctx = {
+    steps: {
+      mine: { objects: [
+        { product_id: 1, variant_id: 10 },
+        { product_id: 2, variant_id: 20 },
+      ] },
+      current: { id: 2 },
+    },
+  };
+  expect(renderTemplate("${steps.mine.objects[product_id=${steps.current.id}].variant_id}", ctx)).toBe(20);
+});
+
+test("[field=value] with no match resolves to undefined", () => {
+  const ctx = { objects: [{ product_id: 1, variant_id: 10 }] };
+  expect(renderTemplate("${?objects[product_id=999].variant_id}", ctx)).toBeUndefined();
+});
+
+test("[field=value] passes a non-array value through unfiltered", () => {
+  // Mirrors a dry-run step stub, which is an object (not an array) until the
+  // step actually runs — the filter is skipped so a downstream path segment
+  // still resolves instead of throwing.
+  const ctx = { steps: { mine: { objects: { variant_id: "STUB" } } } };
+  expect(renderTemplate("${steps.mine.objects[product_id=1].variant_id}", ctx)).toBe("STUB");
+});
+
 test("a guarded key drops its whole group, and skips rendering the group's body", () => {
   const body = {
     "${args.size:+variants}": { "${args.size}": 1 },

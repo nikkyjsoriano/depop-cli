@@ -619,14 +619,17 @@ paths:
 
   # =========================================================================
   # Offers — reverse-engineered from the seller hub's Offers page
-  # (depop.com/sellinghub/offers/, captured live 2026-08-17).
-  #
-  # Two reads and one write, all on the webapi host, each confirmed live:
+  # (depop.com/sellinghub/offers/, captured live 2026-08-17), plus the
+  # individual-offers read fixed live on 2026-08-20 (issue #14).
   #
   #   GET  /presentation/api/v1/offers/me/products/          per-listing summary
-  #   GET  /api/v1/user/likes/notifications/                 likers (send-offer candidates)
-  #   POST /presentation/api/v1/products/<pid>/offers/<oid>/ answer one offer
-  #        body: {"seller_response": "ACCEPT"}
+  #   GET  /presentation/api/v1/products/<pid>/offers/        individual offers on one listing
+  #        ?active=true&include_size=true&variant_id=<n>
+  #   GET  /api/v1/user/likes/notifications/                  likers (send-offer candidates)
+  #   POST /presentation/api/v1/products/<pid>/offers/<oid>/  answer one offer
+  #        body: {"seller_response": "ACCEPT"}                (DECLINE inferred, not shipped)
+  #   POST /presentation/api/v1/offers/<oid>/                 counter one offer — a DIFFERENT
+  #        endpoint (no product_id); body unconfirmed, see below
   #
   # Offers are scoped to a product *and a variant* (size) — the UI routes as
   # /sellinghub/offers/<pid>/?variantId=<n> — but the write keys off product id
@@ -638,14 +641,50 @@ paths:
   # safe to coerce.
   #
   # The write endpoint is one operation discriminated by `seller_response`.
-  # Only ACCEPT is implemented, because only ACCEPT was captured; DECLINE and
-  # COUNTER are inferred and deliberately not shipped.
+  # Only ACCEPT is shipped, because only ACCEPT was captured; DECLINE is
+  # inferred and deliberately not shipped.
   #
-  # NOT IMPLEMENTED, tracked in issues: reading the individual offers on a
-  # listing (GET /presentation/api/v1/products/<pid>/offers/ — returns 400 when
-  # replayed, cause unknown), offer-decline, offer-counter, and sending offers
-  # to all likers. Until the read lands, offer ids for offer-accept have to come
-  # from the Depop web UI.
+  # COUNTER is a DIFFERENT endpoint, not a `seller_response` value on
+  # `offerRespond` — confirmed live 2026-08-20 (countered willfrmphill's real
+  # $60.00 offer to $64.00 via the seller hub UI):
+  #   POST https://webapi.depop.com/presentation/api/v1/offers/<offer_id>/
+  # No `product_id` in the path, unlike `offerRespond`. Recovered from the
+  # page's Performance Timing API after the browser extension's own network
+  # logger failed to capture the request (a known tooling gap — the fetch
+  # wasn't seen by the extension's monkeypatch, root cause unconfirmed). The
+  # exact JSON body is therefore still unknown — see the TBD placeholder at
+  # `/x-depop/offer-counter` below. Next attempt: open Chrome DevTools' Network
+  # tab with "Preserve log" on *before* clicking Counter, so the request
+  # survives even if the tab or extension capture misses it.
+  #
+  # The read afterward shows what changes: `offer_display_status` gains a
+  # `COUNTER_SENT` value, `offer_value` and `sellers_lowest_offer_value` both
+  # become the countered amount (not the buyer's original offer),
+  # `offerers_highest_offer_value` keeps the buyer's original offer,
+  # `can_make_counter_offer` goes back to false, and `expires_at` resets to a
+  # fresh ~24h window.
+  #
+  # THE READ BUG (issue #14): GET .../products/<pid>/offers/ (no query params,
+  # or `variant_id` alone) 400s when replayed through the browser proxy, even
+  # though the identical request succeeds in a real browser tab. Every
+  # single-param and multi-param combination tried before 2026-08-20 failed;
+  # the fix, confirmed live against depop.com/sellinghub in Chrome (read-only,
+  # not through the CLI), is passing THREE query params together:
+  # active=true&include_size=true&variant_id=<n>. `variant_id` is the same
+  # value the summary endpoint already reports per product_id — see
+  # `offer-list` below for how it's resolved without asking the caller for it.
+  #
+  # Response of the individual-offers read: {product_id, product_description,
+  # product_created_on, picture_data, prices: {original_price,
+  # discounted_price, current_price}, variant_set, variant_id, size,
+  # listing_stats: {created_date, likes_count, recent_offers_count},
+  # offers: [{offer_id, offerer_id, offerer_username, offerer_first_name,
+  # offer_value, offer_currency, expires_at, offer_display_status,
+  # can_make_counter_offer, sellers_lowest_offer_value}]}. offer_display_status
+  # observed: RECEIVED, SENT_PRIVATE_OFFER, ACCEPTED; can_make_counter_offer is
+  # true only on RECEIVED.
+  #
+  # NOT IMPLEMENTED, tracked in issues: sending offers to all likers.
   #
   # Accepting is NOT exclusive: it neither cancels nor expires the other offers
   # on the listing, and a listing can hold several accepted offers at once
@@ -660,10 +699,9 @@ paths:
       summary: List every listing of yours that has offers.
       description: >
         The Offers page's "Review offers" column: one row per listing+variant
-        with an offer count, not the offers themselves. Reading the individual
-        offers on a listing is not implemented yet, so use the Depop web UI to
-        see who offered what. Note `offer_count` is a string and reads "10+"
-        once a listing passes ten offers.
+        with an offer count, not the offers themselves. Use `depop offer-list
+        <slug>` to see the individual offers on one listing. Note `offer_count`
+        is a string and reads "10+" once a listing passes ten offers.
       x-depop-workflow:
         result: mine.objects
         steps:
@@ -674,6 +712,59 @@ paths:
       responses:
         "200": { description: One row per listing with offers. }
 
+  /x-depop/offer-list:
+    post:
+      operationId: offerList
+      x-depop-command: offer-list
+      summary: List the individual offers on one listing.
+      description: >
+        Reads every offer on one listing, not just the count `depop offers`
+        gives you — e.g. `depop offer-list dudu-bear-new-balance-1906r-a1b2`.
+        Returns each offer's id (uuid, the id `offer-accept` takes; a shipped
+        `offer-counter` will take it too, once its body is confirmed), the
+        offerer, the offered amount, its status, and whether it can still be
+        countered — plus the listing's own current price and offer/like
+        counts for context.
+        The read is scoped to a product *and* a variant (size); this command
+        resolves the variant for you from `depop offers`'s summary, so it works
+        without you knowing the internal variant id. If the listing currently
+        has no open offers at all it won't be in that summary, and the command
+        fails rather than guessing. A listing with offers on more than one
+        size only resolves one variant, so offers on the others may be missed.
+      x-depop-args:
+        - { name: slug, description: "listing slug, the last path segment of the listing URL", required: true }
+      x-depop-workflow:
+        result: read
+        steps:
+          # 1. Resolve slug -> numeric product id (same as offer-accept/discount/update).
+          - id: current
+            operationId: getListingForEdit
+            request:
+              url: "https://webapi.depop.com/presentation/api/v1/products/by-slug/${args.slug}/edit-listing/"
+
+          # 2. The individual-offers read needs variant_id as a query param and
+          #    there is no other endpoint that gives it for a known product id;
+          #    the per-listing summary already carries it, so re-fetch that and
+          #    look this listing up in it by product id.
+          - id: mine
+            operationId: myOffers
+            request:
+              url: "https://webapi.depop.com/presentation/api/v1/offers/me/products/"
+
+          # 3. Pure transform: pick this product's row out of the summary.
+          - id: variant
+            value: "${steps.mine.objects[product_id=${steps.current.id}].variant_id}"
+
+          # 4. The actual read. active=true + include_size=true + variant_id
+          #    together are what clear the 400 (see the block comment above) —
+          #    captured live 2026-08-20.
+          - id: read
+            operationId: offersOnListing
+            request:
+              url: "https://webapi.depop.com/presentation/api/v1/products/${steps.current.id}/offers/?active=true&include_size=true&variant_id=${steps.variant}"
+      responses:
+        "200": { description: "The listing's individual offers, plus its current price/likes/offer-count context." }
+
   /x-depop/offer-accept:
     post:
       operationId: offerAccept
@@ -683,14 +774,13 @@ paths:
         Accepts one or more offers on a listing, e.g. `depop offer-accept
         dudu-bear-new-balance-1906r-a1b2 --offer 7bf8388b-f5f4-4a02-a6c9-5c387163e1d3`.
         Accepting gives the buyer roughly 24 hours to complete checkout.
-        Offer ids are UUIDs. There is no command that lists them yet, so take
-        them from the Depop web UI for now.
+        Offer ids are UUIDs — get them from `depop offer-list <slug>`.
         This is a real sale and there is no undo. It also does NOT cancel the
         listing's other offers — accepting several offers on a one-of-one item
         will oversell it.
       x-depop-args:
         - { name: slug, description: "listing slug, the last path segment of the listing URL", required: true }
-        - { name: offer, description: "offer id (uuid), from the Depop web UI — repeatable", required: true, multiple: true }
+        - { name: offer, description: "offer id (uuid), from `depop offer-list` — repeatable", required: true, multiple: true }
       x-depop-workflow:
         result: accept
         steps:
@@ -711,6 +801,52 @@ paths:
                 seller_response: ACCEPT
       responses:
         "200": { description: The accepted offer(s). }
+
+  # =========================================================================
+  # offer-decline — NOT SHIPPED. Deliberately absent, same reasoning as before
+  # (issue #14): guessing `seller_response: DECLINE` on `offerRespond` seemed
+  # low-risk because it mirrors the proven ACCEPT shape, but COUNTER turning
+  # out to be a wholly different endpoint (see above) means "answer this
+  # offer" actions can't be assumed to share a shape without their own live
+  # capture. Wait for one before adding this back.
+  #
+  # offer-counter — TBD, gated on a live capture (issue #14). The endpoint is
+  # confirmed (see the block comment above `/x-depop/offers`): POST
+  # https://webapi.depop.com/presentation/api/v1/offers/<offer_id>/, no
+  # product_id. The JSON body is NOT confirmed — do not guess the price field
+  # name. This block is a structural placeholder only, its workflow step has
+  # no body at all yet. Fill in from a future capture:
+  #   - the request body field name for the countered price (maybe
+  #     `offer_value`, `counter_offer_value`, `price`... unknown)
+  #   - whether currency needs to be sent explicitly or is implicit
+  #   - the exact response shape (the read-after shows `offer_display_status:
+  #     COUNTER_SENT` and `offer_value`/`sellers_lowest_offer_value` set to
+  #     the countered amount, but that's `offer-list`'s read, not this
+  #     endpoint's own response — capture that separately)
+  # =========================================================================
+  /x-depop/offer-counter:
+    post:
+      operationId: offerCounter
+      x-depop-command: offer-counter
+      summary: Counter a buyer's offer with a new price.
+      description: >
+        TBD — the endpoint is confirmed live but its request body is not.
+        Placeholder only; do not ship until the real body shape is confirmed
+        (see the block comment above).
+      x-depop-args:
+        - { name: slug, description: "listing slug, the last path segment of the listing URL", required: true }
+        - { name: offer, description: "offer id (uuid), from `depop offer-list`", required: true }
+        - { name: price, description: "TBD — countered price; wire field name unconfirmed until live capture", required: true }
+      x-depop-workflow:
+        result: counter
+        steps:
+          - id: counter
+            operationId: offerCounterRespond
+            request:
+              url: "https://webapi.depop.com/presentation/api/v1/offers/${args.offer}/"
+              # TBD_BODY: { <price field>: "${args.price}" }   # fill in after capture
+      responses:
+        "200": { description: The countered offer. }
 
   /x-depop/likers:
     post:
@@ -793,28 +929,74 @@ paths:
         `{objects, page_info}`, the same envelope as search. Each object is
         `{product_id, picture_data, description, price_amount, price_currency,
         variant_set, variant_id, offer_count}`. `offer_count` is a string and
-        saturates at "10+"; it is not a number.
+        saturates at "10+"; it is not a number. `offer-list` matches this array
+        by `product_id` to resolve the `variant_id` the individual-offers read
+        needs.
       responses:
         "200": { description: One row per listing with offers. }
+
+  /presentation/api/v1/products/{product_id}/offers/:
+    get:
+      operationId: offersOnListing
+      x-depop-hidden: true
+      summary: Read every offer on one listing (product + variant).
+      description: >
+        400s with no extra query params, or with `variant_id` alone (cause
+        unknown); the fix — active=true&include_size=true&variant_id together —
+        was captured live against a real browser session on 2026-08-20 (issue
+        #14; see the block comment above `/x-depop/offers`). `variant_id` isn't
+        validated against `product_id` on the wire but is required regardless;
+        pass the value `myOffers` reports for this product.
+      parameters:
+        - { name: product_id, in: path, required: true, schema: { type: string } }
+        - { name: active, in: query, schema: { type: boolean } }
+        - { name: include_size, in: query, schema: { type: boolean } }
+        - { name: variant_id, in: query, schema: { type: string } }
+      responses:
+        "200": { description: "The listing's offers, plus product/price/stats context." }
 
   /presentation/api/v1/products/{product_id}/offers/{offer_id}/:
     post:
       operationId: offerRespond
       x-depop-hidden: true
-      summary: Answer one offer — accept, decline or counter.
+      summary: Accept one offer.
       description: >
-        One endpoint discriminated by the body's `seller_response`. Captured
-        live only as `{"seller_response": "ACCEPT"}`, which answers 200 with the
-        updated offer object (`offer_display_status: ACCEPTED`, `expires_at`
-        pushed ~24h out for the buyer to check out, plus
-        `offerers_highest_offer_value`). DECLINE and COUNTER are inferred from
-        that shape and are NOT verified. The seller hub fires this with no
-        confirmation step of its own.
+        Discriminated by the body's `seller_response`. Captured live only as
+        `{"seller_response": "ACCEPT"}` (200, updated offer object,
+        `offer_display_status: ACCEPTED`, `expires_at` pushed ~24h out, plus
+        `offerers_highest_offer_value`). DECLINE is NOT shipped: it was
+        assumed to mirror this shape, but COUNTER turning out to be a wholly
+        different endpoint (see `offerCounterRespond` below) means that
+        assumption can't be trusted without its own live capture. The seller
+        hub fires this with no confirmation step of its own.
       parameters:
         - { name: product_id, in: path, required: true, schema: { type: string } }
         - { name: offer_id, in: path, required: true, schema: { type: string } }
       responses:
         "200": { description: The updated offer. }
+
+  /presentation/api/v1/offers/{offer_id}/:
+    post:
+      operationId: offerCounterRespond
+      x-depop-hidden: true
+      summary: Counter one offer with a new price — TBD, endpoint confirmed, body is not.
+      description: >
+        A DIFFERENT endpoint from `offerRespond` (no `product_id` in the
+        path) — confirmed live 2026-08-20 by countering a real $60.00 offer to
+        $64.00 through the seller hub UI, but the request body was not
+        captured: the browser extension's network logger didn't see the fetch
+        (root cause unconfirmed), and the URL itself was only recovered
+        afterward from `performance.getEntriesByType("resource")`. Do not
+        guess the body. Next attempt: open Chrome DevTools' Network tab with
+        "Preserve log" on before clicking Counter, so the request survives
+        even if the extension's own capture misses it again. The read
+        afterward (`offer-list`) shows `offer_display_status: COUNTER_SENT`
+        and `offer_value`/`sellers_lowest_offer_value` set to the countered
+        amount — but that's a different endpoint's response, not this one's.
+      parameters:
+        - { name: offer_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: The updated offer. Shape unconfirmed. }
 
   /api/v1/user/likes/notifications/:
     get:
